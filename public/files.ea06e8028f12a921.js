@@ -16,6 +16,7 @@ var preloadFilesEditor = async () => {
   }
 };
 var filesEditorText = () => editorModule?.editorText() ?? "";
+var replaceFilesEditorText = (content) => editorModule?.replaceEditorText(content);
 async function openFilesEditor(element, content, path, changed) {
   const module = await loadEditorModule();
   await module.openEditor(element, content, path, changed);
@@ -55,9 +56,11 @@ var FilesController = class {
   savedText = "";
   dirty = false;
   saving = false;
+  externalFile = null;
   treeRequest = 0;
   openRequest = 0;
   prefetchHandle = null;
+  checkingExternal = false;
   route() {
     return fileRoute(this.project, this.openPath);
   }
@@ -116,6 +119,13 @@ var FilesController = class {
   canDiscard() {
     return !this.dirty || this.adapter.confirmDiscard();
   }
+  fileVersion(file) {
+    return file.version || file.revision || null;
+  }
+  clearConflict() {
+    this.externalFile = null;
+    this.view.setConflict(false);
+  }
   async switchProject(id) {
     this.view.closeProjectMenu();
     if (id === this.project) return true;
@@ -126,6 +136,7 @@ var FilesController = class {
     this.openVersion = null;
     this.savedText = "";
     this.dirty = false;
+    this.clearConflict();
     this.expanded.clear();
     this.view.renderProjects(this.projects, this.project);
     this.view.renderBreadcrumbs(this.project, null);
@@ -146,6 +157,7 @@ var FilesController = class {
       this.openVersion = null;
       this.savedText = "";
       this.dirty = false;
+      this.clearConflict();
       this.expanded.clear();
       this.view.renderProjects(this.projects, id);
       await this.loadTree();
@@ -158,6 +170,7 @@ var FilesController = class {
     this.openVersion = null;
     this.savedText = "";
     this.dirty = false;
+    this.clearConflict();
     this.view.selectPath(null);
     this.view.renderBreadcrumbs(this.project, null);
     this.setSaveState("", "");
@@ -165,6 +178,7 @@ var FilesController = class {
   }
   discardChanges() {
     this.dirty = false;
+    this.clearConflict();
     this.setSaveState("", "");
   }
   async routeFile(path) {
@@ -186,6 +200,7 @@ var FilesController = class {
     this.openVersion = null;
     this.savedText = "";
     this.dirty = false;
+    this.clearConflict();
     this.setSaveState("", "");
     try {
       const file = await this.adapter.readFile(project, path);
@@ -202,7 +217,7 @@ var FilesController = class {
         if (request !== this.openRequest || project !== this.project)
           return false;
         this.openPath = file.editable ? path : null;
-        this.openVersion = file.version || file.revision || null;
+        this.openVersion = this.fileVersion(file);
         this.savedText = file.content;
         this.view.showEditor(Boolean(file.editable));
         this.setSaveState("", file.editable ? "" : "READ ONLY");
@@ -217,16 +232,88 @@ var FilesController = class {
   }
   editorChanged(text) {
     this.dirty = text !== this.savedText;
-    this.setSaveState(this.dirty ? "dirty" : "", this.dirty ? "UNSAVED" : "");
+    if (this.externalFile) this.setSaveState("error", "CHANGED ON DISK");
+    else
+      this.setSaveState(this.dirty ? "dirty" : "", this.dirty ? "UNSAVED" : "");
   }
   setSaveState(state, text) {
-    this.view.setSaveState(state, text, this.dirty && !this.saving);
+    this.view.setSaveState(
+      state,
+      text,
+      this.dirty && !this.saving && !this.externalFile
+    );
+  }
+  async captureExternalChange(project, path) {
+    const fresh = await this.adapter.readFile(project, path, true);
+    if (project !== this.project || path !== this.openPath) return false;
+    const revision = this.fileVersion(fresh);
+    if (!revision || revision === this.openVersion) return false;
+    this.externalFile = fresh;
+    this.view.setConflict(true);
+    return true;
+  }
+  async checkExternalChange() {
+    if (!this.openPath || !this.openVersion || this.saving || this.checkingExternal)
+      return false;
+    const project = this.project;
+    const path = this.openPath;
+    const knownVersion = this.externalFile ? this.fileVersion(this.externalFile) : this.openVersion;
+    this.checkingExternal = true;
+    try {
+      const latest = await this.adapter.fileRevision(project, path);
+      if (project !== this.project || path !== this.openPath || latest.revision === knownVersion)
+        return false;
+      const changed = await this.captureExternalChange(project, path);
+      if (!changed) return false;
+      if (!this.dirty && this.externalFile?.content != null) {
+        const fresh = this.externalFile;
+        this.adapter.replaceEditor(fresh.content);
+        this.openVersion = this.fileVersion(fresh);
+        this.savedText = fresh.content;
+        this.dirty = false;
+        this.clearConflict();
+        this.setSaveState("saved", "UPDATED");
+      } else {
+        this.setSaveState("error", "CHANGED ON DISK");
+      }
+      return true;
+    } catch {
+      return false;
+    } finally {
+      this.checkingExternal = false;
+    }
+  }
+  compareExternal() {
+    if (!this.externalFile) return;
+    this.view.showComparison(
+      this.adapter.editorText(),
+      this.externalFile.content || ""
+    );
+  }
+  reloadExternal() {
+    if (!this.externalFile?.content && this.externalFile?.content !== "")
+      return false;
+    this.adapter.replaceEditor(this.externalFile.content);
+    this.openVersion = this.fileVersion(this.externalFile);
+    this.savedText = this.externalFile.content;
+    this.dirty = false;
+    this.clearConflict();
+    this.setSaveState("saved", "RELOADED");
+    return true;
+  }
+  async overwriteExternal() {
+    const revision = this.externalFile && this.fileVersion(this.externalFile);
+    if (!revision) return false;
+    return this.persist(revision);
   }
   async save() {
+    if (this.externalFile) return false;
+    return this.persist(this.openVersion);
+  }
+  async persist(expectedRevision) {
     if (!this.openPath || !this.dirty || this.saving) return false;
     const project = this.project;
     const path = this.openPath;
-    const version = this.openVersion;
     const submitted = this.adapter.editorText();
     this.saving = true;
     this.setSaveState("", "SAVING\u2026");
@@ -237,13 +324,14 @@ var FilesController = class {
         project,
         path,
         content: submitted,
-        expectedRevision: version
+        expectedRevision
       });
       const fresh = await this.adapter.readFile(project, path, true);
       if (project !== this.project || path !== this.openPath) return false;
-      this.openVersion = fresh.version || fresh.revision || version;
+      this.openVersion = this.fileVersion(fresh) || expectedRevision;
       this.savedText = submitted;
       this.dirty = this.adapter.editorText() !== submitted;
+      this.clearConflict();
       finalState = this.dirty ? "dirty" : "saved";
       finalText = this.dirty ? "UNSAVED" : "SAVED";
       return true;
@@ -251,7 +339,14 @@ var FilesController = class {
       if (project === this.project && path === this.openPath) {
         this.dirty = this.adapter.editorText() !== this.savedText;
         finalState = "error";
-        finalText = this.adapter.errorMessage(error);
+        if (this.adapter.isConflict(error)) {
+          try {
+            await this.captureExternalChange(project, path);
+            finalText = "CHANGED ON DISK";
+          } catch {
+            finalText = this.adapter.errorMessage(error);
+          }
+        } else finalText = this.adapter.errorMessage(error);
       }
       return false;
     } finally {
@@ -347,6 +442,15 @@ function createFilesDomView(options) {
       $("#saveFile").disabled = !canSave;
       $("#saveFile").classList.toggle("hidden", !controller.openPath);
     },
+    setConflict(visible) {
+      $("#fileConflict").classList.toggle("hidden", !visible);
+      $("#files .viewer").classList.toggle("file-conflicted", visible);
+    },
+    showComparison(draft, disk) {
+      $("#conflictDraft").textContent = draft;
+      $("#conflictDisk").textContent = disk;
+      $("#fileConflictDialog").showModal();
+    },
     selectPath(path) {
       if (selectedPath)
         $(`.node[data-path="${CSS.escape(selectedPath)}"]`)?.classList.remove(
@@ -366,6 +470,10 @@ function createFilesDomView(options) {
   return Object.assign(view, {
     attach(value) {
       controller = value;
+      $("#conflictCompare").onclick = () => controller.compareExternal();
+      $("#conflictReload").onclick = () => controller.reloadExternal();
+      $("#conflictOverwrite").onclick = () => void controller.overwriteExternal();
+      $("#closeFileConflict").onclick = () => $("#fileConflictDialog").close();
       return view;
     }
   });
@@ -378,5 +486,6 @@ export {
   filesEditorText,
   openFilesEditor,
   preloadFilesEditor,
+  replaceFilesEditorText,
   visibleTree
 };

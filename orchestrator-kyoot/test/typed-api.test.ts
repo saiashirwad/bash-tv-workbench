@@ -51,6 +51,12 @@ const backend: WorkbenchBackend = {
     mime: "text/plain",
     editable: true,
   }),
+  fileRevision: async (_project, path) => ({
+    path,
+    revision: "one",
+    size: 5,
+    mtime: now,
+  }),
   writeFile: async ({ path }) => ({ path, revision: "two" }),
   searchFiles: async () => [],
   gitInfo: async () => ({

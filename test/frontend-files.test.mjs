@@ -42,9 +42,15 @@ function harness(overrides = {}) {
       editable: true,
       version: "v1",
     }),
+    fileRevision: async () => ({ revision: "v1" }),
     writeFile: async (input) => calls.push(["write", input]),
     editorText: () => text,
     openEditor: async () => {},
+    replaceEditor: (content) => {
+      text = content;
+      calls.push(["replace", content]);
+    },
+    isConflict: (error) => error.message === "revision conflict",
     confirmDiscard: () => true,
     navigate: (url, replace) => calls.push(["navigate", url, replace]),
     schedule: (callback) => setTimeout(callback, 0),
@@ -65,6 +71,8 @@ function harness(overrides = {}) {
     showOpenError: (message) => calls.push(["error", message]),
     setSaveState: (state, message, canSave) =>
       states.push([state, message, canSave]),
+    setConflict: (visible) => calls.push(["conflict", visible]),
+    showComparison: (draft, disk) => calls.push(["compare", draft, disk]),
     selectPath: () => {},
     closeProjectMenu: () => calls.push(["menu", false]),
   };
@@ -160,7 +168,22 @@ test("starting a file switch keeps the current preview visible", () => {
 
 test("save conflicts preserve dirty editor state and expected revision", async () => {
   let writes = 0;
+  let reads = 0;
   const h = harness({
+    readFile: async () =>
+      reads++ === 0
+        ? {
+            content: "original",
+            mime: "text/plain",
+            editable: true,
+            version: "v1",
+          }
+        : {
+            content: "agent edit",
+            mime: "text/plain",
+            editable: true,
+            version: "v2",
+          },
     writeFile: async () => {
       writes++;
       throw new Error("revision conflict");
@@ -175,7 +198,76 @@ test("save conflicts preserve dirty editor state and expected revision", async (
   assert.equal(h.controller.dirty, true);
   assert.equal(h.controller.openVersion, "v1");
   assert.equal(h.controller.savedText, "original");
-  assert.ok(h.states.some((state) => state[1] === "revision conflict"));
+  assert.equal(h.controller.externalFile?.version, "v2");
+  assert.ok(h.states.some((state) => state[1] === "CHANGED ON DISK"));
+  assert.ok(h.calls.some((call) => call[0] === "conflict" && call[1] === true));
+});
+
+test("an external edit refreshes a clean editor without a save conflict", async () => {
+  let disk = {
+    content: "original",
+    mime: "text/plain",
+    editable: true,
+    version: "v1",
+  };
+  const h = harness({
+    readFile: async () => disk,
+    fileRevision: async () => ({ revision: disk.version }),
+  });
+  h.controller.syncProjects();
+  await h.controller.openFile("README.md", false, false);
+
+  disk = { ...disk, content: "agent edit", version: "v2" };
+  assert.equal(await h.controller.checkExternalChange(), true);
+  assert.equal(h.controller.savedText, "agent edit");
+  assert.equal(h.controller.openVersion, "v2");
+  assert.equal(h.controller.dirty, false);
+  assert.ok(
+    h.calls.some((call) => call[0] === "replace" && call[1] === "agent edit"),
+  );
+});
+
+test("an external edit preserves a dirty draft until the user resolves it", async () => {
+  let disk = {
+    content: "original",
+    mime: "text/plain",
+    editable: true,
+    version: "v1",
+  };
+  const writes = [];
+  const h = harness({
+    readFile: async () => disk,
+    fileRevision: async () => ({ revision: disk.version }),
+    writeFile: async (input) => {
+      writes.push(input);
+      disk = { ...disk, content: input.content, version: "v3" };
+    },
+  });
+  h.controller.syncProjects();
+  await h.controller.openFile("README.md", false, false);
+  h.setText("browser draft");
+  h.controller.editorChanged("browser draft");
+  disk = { ...disk, content: "agent edit", version: "v2" };
+
+  assert.equal(await h.controller.checkExternalChange(), true);
+  assert.equal(h.controller.dirty, true);
+  assert.equal(h.controller.externalFile?.content, "agent edit");
+  assert.equal(await h.controller.save(), false);
+  assert.equal(writes.length, 0);
+  h.controller.compareExternal();
+  assert.ok(
+    h.calls.some(
+      (call) =>
+        call[0] === "compare" &&
+        call[1] === "browser draft" &&
+        call[2] === "agent edit",
+    ),
+  );
+
+  assert.equal(await h.controller.overwriteExternal(), true);
+  assert.equal(writes[0].expectedRevision, "v2");
+  assert.equal(h.controller.dirty, false);
+  assert.equal(h.controller.externalFile, null);
 });
 
 test("project switching resets file state and emits encoded routes", async () => {

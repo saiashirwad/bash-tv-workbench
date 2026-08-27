@@ -1,5 +1,6 @@
 import type {
   FileEntry,
+  FileRevision,
   GitCommit,
   Project,
   RegisterProjectInput,
@@ -78,6 +79,10 @@ export interface WorkbenchServices {
   ): Promise<any>;
   gitInfo(root: string, commit?: string): Promise<any>;
   readFile(project: WorkbenchProject, relative: string): Promise<any>;
+  fileRevision(
+    project: WorkbenchProject,
+    relative: string,
+  ): Promise<FileRevision>;
   writeFile(
     project: WorkbenchProject,
     relative: string,
@@ -213,6 +218,8 @@ export const kyootBackend = (
   },
   readFile: (project, path) =>
     services.readFile(requireProject(services.projects, project), path),
+  fileRevision: (project, path) =>
+    services.fileRevision(requireProject(services.projects, project), path),
   async writeFile(input) {
     const result = await services.writeFile(
       requireProject(services.projects, input.project),

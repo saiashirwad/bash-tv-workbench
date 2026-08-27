@@ -9,6 +9,7 @@ import {
   SyncMutations,
   WorkbenchClient,
   type FileEntry,
+  type FileRevision,
   type GitCommit,
   type LiveMessagePage,
   type Project,
@@ -148,6 +149,7 @@ export interface WorkbenchStore {
     readonly editable?: boolean;
     readonly mtime?: string;
   }>;
+  fileRevision(project: string, path: string): Promise<FileRevision>;
   writeFile(input: {
     readonly project: string;
     readonly path: string;
@@ -402,6 +404,7 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
       query(["tree", project, path], () => run(WorkbenchClient.files.tree({ project, path }))),
     readFile: (project, path) =>
       query(["file", project, path], () => run(WorkbenchClient.files.read({ project, path }))),
+    fileRevision: (project, path) => run(WorkbenchClient.files.revision({ project, path })),
     async writeFile(input) {
       const cached = query(["file", input.project, input.path], () =>
         run(

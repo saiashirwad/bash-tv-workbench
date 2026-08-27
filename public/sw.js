@@ -1,7 +1,7 @@
 (() => {
   // frontend/sw.ts
   var serviceWorker = self;
-  var CACHE = "bash-workbench-shell-2226714119a9107a";
+  var CACHE = "bash-workbench-shell-663f15fcf119642b";
   var MANIFEST = "/asset-manifest.json";
   var shell = /* @__PURE__ */ new Set();
   var loadShell = async () => {

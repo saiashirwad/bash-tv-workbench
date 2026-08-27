@@ -28,26 +28,86 @@
     <link rel="stylesheet" href="/auth.css" />
   </head>
   <body class="auth-pending">
-    <aside id="openAccessWarning" class="openaccesswarning" role="status" hidden>
-      EXPERIMENTAL OPEN ACCESS — anyone viewing this Workbench can run agents, commands, and file operations.
+    <aside
+      id="openAccessWarning"
+      class="openaccesswarning"
+      role="status"
+      hidden
+    >
+      EXPERIMENTAL OPEN ACCESS — anyone viewing this Workbench can run agents,
+      commands, and file operations.
     </aside>
-    <dialog id="authDialog" class="authdialog" aria-labelledby="authTitle" aria-describedby="authDescription authRoles">
+    <dialog
+      id="authDialog"
+      class="authdialog"
+      aria-labelledby="authTitle"
+      aria-describedby="authDescription authRoles"
+    >
       <form id="authForm" class="authcard" method="dialog">
         <div class="authbrand" aria-label="Bash.tv Workbench">
-          <span class="bashface" aria-hidden="true"><i></i><i></i><em></em></span><b><span>BASH</span><small>.TV</small></b><span class="authbranddivider"></span><strong>WORKBENCH</strong>
+          <span class="bashface" aria-hidden="true"
+            ><i></i><i></i><em></em></span
+          ><b><span>BASH</span><small>.TV</small></b
+          ><span class="authbranddivider"></span><strong>WORKBENCH</strong>
         </div>
-        <div class="authintro"><span class="autheyebrow">PRIVATE WORKSPACE</span><h1 id="authTitle">Sign in to Workbench</h1><p id="authDescription">Enter the credential shared with you by this Workbench’s owner.</p></div>
-        <div id="authRoles" class="authroles"><p><b>Owner</b><span>Full workspace administration and access.</span></p><p><b>Collaborator</b><span>Access granted by the workspace owner.</span></p></div>
-        <label class="authfield" for="authCredential"><span>OWNER OR COLLABORATOR CREDENTIAL</span><input class="sr-only" name="username" autocomplete="username" value="workbench" tabindex="-1" aria-hidden="true" /><input id="authCredential" name="credential" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required aria-describedby="authHint authError" /></label>
-        <small id="authHint" class="authhint">Your credential is exchanged for a secure, HttpOnly browser session and is not stored by this page.</small>
-        <div id="authError" class="autherror" role="alert" aria-live="assertive"></div>
-        <button id="authSubmit" class="authsubmit" type="submit"><span id="authSubmitLabel">ENTER WORKBENCH</span><span aria-hidden="true">→</span></button>
+        <div class="authintro">
+          <span class="autheyebrow">PRIVATE WORKSPACE</span>
+          <h1 id="authTitle">Sign in to Workbench</h1>
+          <p id="authDescription">
+            Enter the credential shared with you by this Workbench’s owner.
+          </p>
+        </div>
+        <div id="authRoles" class="authroles">
+          <p>
+            <b>Owner</b><span>Full workspace administration and access.</span>
+          </p>
+          <p>
+            <b>Collaborator</b
+            ><span>Access granted by the workspace owner.</span>
+          </p>
+        </div>
+        <label class="authfield" for="authCredential"
+          ><span>OWNER OR COLLABORATOR CREDENTIAL</span
+          ><input
+            class="sr-only"
+            name="username"
+            autocomplete="username"
+            value="workbench"
+            tabindex="-1"
+            aria-hidden="true" /><input
+            id="authCredential"
+            name="credential"
+            type="password"
+            autocomplete="current-password"
+            autocapitalize="none"
+            spellcheck="false"
+            required
+            aria-describedby="authHint authError"
+        /></label>
+        <small id="authHint" class="authhint"
+          >Your credential is exchanged for a secure, HttpOnly browser session
+          and is not stored by this page.</small
+        >
+        <div
+          id="authError"
+          class="autherror"
+          role="alert"
+          aria-live="assertive"
+        ></div>
+        <button id="authSubmit" class="authsubmit" type="submit">
+          <span id="authSubmitLabel">ENTER WORKBENCH</span
+          ><span aria-hidden="true">→</span>
+        </button>
       </form>
     </dialog>
     <header>
       <div class="brand" aria-label="Bash Workbench">
         <span class="bashface" aria-hidden="true"><i></i><i></i><em></em></span>
-        <b><span class="brandbash">BASH</span><span class="brandtv">.TV</span><span class="branddivider"></span><span class="brandworkbench">WORKBENCH</span></b>
+        <b
+          ><span class="brandbash">BASH</span><span class="brandtv">.TV</span
+          ><span class="branddivider"></span
+          ><span class="brandworkbench">WORKBENCH</span></b
+        >
       </div>
       <div class="projectpicker headerprojectpicker">
         <button
@@ -71,7 +131,9 @@
         ></div>
       </div>
       <button id="quickOpen" title="Open files or commands (Ctrl/Cmd+P)">
-        <span class="quickopenicon">⌕</span><span class="quickopenlabel">Search files or commands</span><kbd>⌘P</kbd>
+        <span class="quickopenicon">⌕</span
+        ><span class="quickopenlabel">Search files or commands</span
+        ><kbd>⌘P</kbd>
       </button>
       <nav id="topNav" aria-label="Workbench navigation">
         <button data-page="session" class="active" title="Live">
@@ -122,8 +184,17 @@
               <path d="M6 6.6v3.2c0 2.8 2 4.1 5.2 4.1h1.2M14 7.4v6" /></svg></i
           ><span>Git</span>
         </button>
-        <button id="webmcpConnect" class="webmcpconnect" type="button" title="Connect Claude Code or Codex through WebMCP">
-          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 6.5V4m5 2.5V4M5 9h10v2.5a5 5 0 0 1-5 5 5 5 0 0 1-5-5ZM3 9h14M10 16.5V19" /></svg><span>Connect</span>
+        <button
+          id="webmcpConnect"
+          class="webmcpconnect"
+          type="button"
+          title="Connect Claude Code or Codex through WebMCP"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path
+              d="M7.5 6.5V4m5 2.5V4M5 9h10v2.5a5 5 0 0 1-5 5 5 5 0 0 1-5-5ZM3 9h14M10 16.5V19"
+            /></svg
+          ><span>Connect</span>
         </button>
         <div class="linkmenu">
           <button
@@ -159,7 +230,11 @@
             <small id="downloadProjectName"></small>
             <a id="downloadSource">Source ZIP</a>
             <a id="downloadBundle">Git bundle</a>
-            <a href="/api/projects/bash-workbench/source.zip" download="bash-workbench-standalone.zip">Standalone Workbench ZIP</a>
+            <a
+              href="/api/projects/bash-workbench/source.zip"
+              download="bash-workbench-standalone.zip"
+              >Standalone Workbench ZIP</a
+            >
           </div>
         </div>
       </nav>
@@ -176,7 +251,12 @@
               <button id="trajectoryTab" role="tab" aria-selected="false">
                 Trajectory
               </button>
-              <button id="chatTab" class="active" role="tab" aria-selected="true">
+              <button
+                id="chatTab"
+                class="active"
+                role="tab"
+                aria-selected="true"
+              >
                 Live Chat
               </button>
             </div>
@@ -252,8 +332,14 @@
             <aside id="agentInspect" class="agentinspect">
               <div class="inspecttoolbar">
                 <h2>DETAILS</h2>
-                <button id="toggleAgentInspect" class="toggleinspectbtn" title="Toggle inspector sidebar (⌘I)">
-                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 10h8M10 6l4 4-4 4"/></svg>
+                <button
+                  id="toggleAgentInspect"
+                  class="toggleinspectbtn"
+                  title="Toggle inspector sidebar (⌘I)"
+                >
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M6 10h8M10 6l4 4-4 4" />
+                  </svg>
                 </button>
               </div>
               <div id="agentMeta"></div>
@@ -273,12 +359,18 @@
                     title="Collapse all folders"
                     aria-label="Collapse folders"
                   >
-                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" /></svg>
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="m6 8 4 4 4-4" />
+                    </svg>
                   </button>
                 </div>
                 <div class="treefilterwrap">
                   <span class="treefiltericon">⌕</span>
-                  <input id="filter" placeholder="Filter files…" aria-label="Filter files" />
+                  <input
+                    id="filter"
+                    placeholder="Filter files…"
+                    aria-label="Filter files"
+                  />
                 </div>
               </div>
               <div id="tree"></div>
@@ -291,6 +383,16 @@
                   ><button id="saveFile" class="hidden" disabled>SAVE</button
                   ><a id="raw" class="hidden" target="_blank">RAW ↗</a></span
                 >
+              </div>
+              <div id="fileConflict" class="fileconflict hidden" role="status">
+                <span><b>Changed on disk.</b> Your editor draft is safe.</span>
+                <span class="fileconflictactions">
+                  <button id="conflictCompare" type="button">Compare</button>
+                  <button id="conflictReload" type="button">Reload disk</button>
+                  <button id="conflictOverwrite" type="button">
+                    Keep mine
+                  </button>
+                </span>
               </div>
               <div id="editor" class="hidden"></div>
               <div id="media"></div>
@@ -326,6 +428,31 @@
         </section>
       </main>
     </div>
+    <dialog
+      id="fileConflictDialog"
+      class="fileconflictdialog"
+      aria-labelledby="fileConflictTitle"
+    >
+      <header>
+        <div>
+          <small>File conflict</small>
+          <h2 id="fileConflictTitle">Compare changes</h2>
+        </div>
+        <button id="closeFileConflict" type="button" aria-label="Close">
+          ×
+        </button>
+      </header>
+      <div class="fileconflictcompare">
+        <section>
+          <h3>Your draft</h3>
+          <pre id="conflictDraft"></pre>
+        </section>
+        <section>
+          <h3>Current file on disk</h3>
+          <pre id="conflictDisk"></pre>
+        </section>
+      </div>
+    </dialog>
     <div
       id="filePalette"
       class="palette hidden"
@@ -358,29 +485,96 @@
         </div>
       </div>
     </div>
-    <dialog id="webmcpDialog" class="webmcpdialog" aria-labelledby="webmcpTitle">
+    <dialog
+      id="webmcpDialog"
+      class="webmcpdialog"
+      aria-labelledby="webmcpTitle"
+    >
       <div class="webmcpshell">
         <header class="webmcphead">
-          <div><span class="webmcpeyebrow">DESKTOP AGENT BRIDGE</span><h2 id="webmcpTitle">Connect to Workbench</h2></div>
-          <button id="closeWebmcp" type="button" aria-label="Close WebMCP setup">×</button>
+          <div>
+            <span class="webmcpeyebrow">DESKTOP AGENT BRIDGE</span>
+            <h2 id="webmcpTitle">Connect to Workbench</h2>
+          </div>
+          <button
+            id="closeWebmcp"
+            type="button"
+            aria-label="Close WebMCP setup"
+          >
+            ×
+          </button>
         </header>
-        <div class="webmcpstatus"><span id="webmcpStatusMark"></span><div><b id="webmcpStatusTitle">Checking browser support…</b><small id="webmcpStatusText">The desktop bridge launches its own WebMCP-enabled Chrome.</small></div></div>
-        <p class="webmcpintro">Expose this Workbench’s typed project, file, Git, agent, and workflow tools to your coding assistant. Run one command on the computer where Claude Code or Codex is installed.</p>
+        <div class="webmcpstatus">
+          <span id="webmcpStatusMark"></span>
+          <div>
+            <b id="webmcpStatusTitle">Checking browser support…</b
+            ><small id="webmcpStatusText"
+              >The desktop bridge launches its own WebMCP-enabled Chrome.</small
+            >
+          </div>
+        </div>
+        <p class="webmcpintro">
+          Expose this Workbench’s typed project, file, Git, agent, and workflow
+          tools to your coding assistant. Run one command on the computer where
+          Claude Code or Codex is installed.
+        </p>
         <div class="webmcptabs" role="tablist" aria-label="Coding assistant">
-          <button id="webmcpClaudeTab" class="active" type="button" role="tab" aria-selected="true" data-webmcp-client="claude">Claude Code</button>
-          <button id="webmcpCodexTab" type="button" role="tab" aria-selected="false" data-webmcp-client="codex">Codex</button>
+          <button
+            id="webmcpClaudeTab"
+            class="active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            data-webmcp-client="claude"
+          >
+            Claude Code
+          </button>
+          <button
+            id="webmcpCodexTab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-webmcp-client="codex"
+          >
+            Codex
+          </button>
         </div>
         <section class="webmcpstep">
-          <div class="webmcpstepnum">1</div><div class="webmcpstepbody"><b>Add the Chrome bridge</b><small>Requires Node.js 20+ and Chrome 150+.</small>
-            <div class="webmcpcopy"><code id="webmcpCommand"></code><button type="button" data-copy-webmcp="command">Copy</button></div>
+          <div class="webmcpstepnum">1</div>
+          <div class="webmcpstepbody">
+            <b>Add the Chrome bridge</b
+            ><small>Requires Node.js 20+ and Chrome 150+.</small>
+            <div class="webmcpcopy">
+              <code id="webmcpCommand"></code
+              ><button type="button" data-copy-webmcp="command">Copy</button>
+            </div>
           </div>
         </section>
         <section class="webmcpstep">
-          <div class="webmcpstepnum">2</div><div class="webmcpstepbody"><b>Start a fresh assistant session, then paste this</b><small>The assistant will open this Workbench and discover its page tools.</small>
-            <div class="webmcpcopy webmcpprompt"><code id="webmcpPrompt"></code><button type="button" data-copy-webmcp="prompt">Copy</button></div>
+          <div class="webmcpstepnum">2</div>
+          <div class="webmcpstepbody">
+            <b>Start a fresh assistant session, then paste this</b
+            ><small
+              >The assistant will open this Workbench and discover its page
+              tools.</small
+            >
+            <div class="webmcpcopy webmcpprompt">
+              <code id="webmcpPrompt"></code
+              ><button type="button" data-copy-webmcp="prompt">Copy</button>
+            </div>
           </div>
         </section>
-        <footer class="webmcpfoot"><span><b id="webmcpToolCount">48 tools</b> · shell, processes, artifacts, files, Git, runs, workflows</span><a href="/api/projects/bash-workbench/raw?path=WEBMCP.md" target="_blank" rel="noopener">Setup details ↗</a></footer>
+        <footer class="webmcpfoot">
+          <span
+            ><b id="webmcpToolCount">48 tools</b> · shell, processes, artifacts,
+            files, Git, runs, workflows</span
+          ><a
+            href="/api/projects/bash-workbench/raw?path=WEBMCP.md"
+            target="_blank"
+            rel="noopener"
+            >Setup details ↗</a
+          >
+        </footer>
       </div>
     </dialog>
     <dialog id="agentDialog" aria-label="New agent">
@@ -414,6 +608,6 @@
         </div>
       </form>
     </dialog>
-    <script type="module" src="/app.f2f64cf7f19e0c50.js"></script>
+    <script type="module" src="/app.9d1eeec79633c893.js"></script>
   </body>
 </html>

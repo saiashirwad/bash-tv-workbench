@@ -6,6 +6,7 @@ import { handlers as syncHandlers, SyncRpc } from "@kyoot/sync/rpc";
 import {
   WorkbenchRpc,
   type FileEntry,
+  type FileRevision,
   type GitCommit,
   type Project,
   type RegisterProjectInput,
@@ -105,6 +106,7 @@ export interface WorkbenchBackend {
     readonly editable?: boolean;
     readonly mtime?: string;
   }>;
+  fileRevision(project: string, path: string): Promise<FileRevision>;
   writeFile(input: {
     readonly project: string;
     readonly path: string;
@@ -443,6 +445,7 @@ export const makeTypedApi = async (
       tree: ({ project, path }) =>
         promise(async () => [...(await backend.fileTree(project, path))]),
       read: ({ project, path }) => promise(() => backend.readFile(project, path)),
+      revision: ({ project, path }) => promise(() => backend.fileRevision(project, path)),
       write: (input) =>
         promise(async () => {
           const result = await backend.writeFile(input);

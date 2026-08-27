@@ -34,6 +34,7 @@ import {
   filesEditorText,
   openFilesEditor,
   preloadFilesEditor,
+  replaceFilesEditorText,
 } from "/files.js";
 // @ts-expect-error vendored Page.js runtime
 import page from "/page.mjs";
@@ -88,6 +89,7 @@ function showPage(page: string, push = false) {
   );
   $$(".page").forEach((x) => x.classList.toggle("hidden", x.id !== page));
   if (page !== "session") liveChat.stop();
+  if (page === "files") void refreshOpenFile();
   if (push) navigate(routeFor(page));
 }
 const esc = escapeHtml;
@@ -101,6 +103,10 @@ const errorMessage = (error: any) => {
   }
   return String(error);
 };
+const isFileConflict = (error: any) =>
+  error?._tag === "FileRevisionConflict" ||
+  error?.error?._tag === "FileRevisionConflict" ||
+  /changed on disk|revision conflict/i.test(errorMessage(error));
 const gitController = createGitController({
   query: $,
   queryAll: $$,
@@ -334,11 +340,14 @@ const filesController = new FilesController(
     loadTree: (project, force) => workbench.fileTree(project).load({ force }),
     readFile: (project, path, force = false) =>
       workbench.readFile(project, path).load({ force }),
+    fileRevision: (project, path) => workbench.fileRevision(project, path),
     writeFile: (input) => workbench.writeFile(input),
     editorText: filesEditorText,
+    replaceEditor: replaceFilesEditorText,
     openEditor: (content, path, changed) =>
       openFilesEditor($("#editor"), content, path, changed),
     confirmDiscard: () => confirm("Discard unsaved changes?"),
+    isConflict: isFileConflict,
     navigate,
     schedule: (callback, delay) => setTimeout(callback, delay),
     cancelScheduled: (handle) => clearTimeout(handle as number),
@@ -347,6 +356,27 @@ const filesController = new FilesController(
   filesView,
 );
 filesView.attach(filesController);
+let fileMonitorBusy = false;
+async function refreshOpenFile() {
+  if (
+    fileMonitorBusy ||
+    document.visibilityState === "hidden" ||
+    $("#files").classList.contains("hidden")
+  )
+    return;
+  fileMonitorBusy = true;
+  try {
+    await workbench.refreshInvalidations();
+    await filesController.checkExternalChange();
+  } catch {
+    // A later interval or focus event retries after transient connection errors.
+  } finally {
+    fileMonitorBusy = false;
+  }
+}
+setInterval(() => void refreshOpenFile(), 1500);
+addEventListener("focus", () => void refreshOpenFile());
+document.addEventListener("visibilitychange", () => void refreshOpenFile());
 const currentProject = () => filesController.project;
 function renderProjectMenu() {
   filesController.syncProjects(projects);

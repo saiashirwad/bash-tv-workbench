@@ -95,6 +95,13 @@ export const FileEntry = z.object({
   mtime: z.string().optional(),
 });
 export type FileEntry = z.output<typeof FileEntry>;
+export const FileRevision = z.object({
+  path: z.string(),
+  revision: z.string(),
+  size: z.number().int().nonnegative(),
+  mtime: z.string(),
+});
+export type FileRevision = z.output<typeof FileRevision>;
 export const GitCommit = z.object({
   hash: z.string(),
   shortHash: z.string(),
@@ -338,6 +345,11 @@ export const WorkbenchRpc = api("workbench", {
         editable: z.boolean().optional(),
         mtime: z.string().optional(),
       }),
+      error: DomainError,
+    }),
+    revision: query({
+      input: ProjectPath,
+      output: FileRevision,
       error: DomainError,
     }),
     write: mutation({

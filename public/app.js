@@ -12,7 +12,8 @@ import {
   fileRoute,
   filesEditorText,
   openFilesEditor,
-  preloadFilesEditor
+  preloadFilesEditor,
+  replaceFilesEditorText
 } from "/files.js";
 import page from "/page.mjs";
 var markdownModule = null;
@@ -66,6 +67,7 @@ function showPage(page2, push = false) {
   );
   $$(".page").forEach((x) => x.classList.toggle("hidden", x.id !== page2));
   if (page2 !== "session") liveChat.stop();
+  if (page2 === "files") void refreshOpenFile();
   if (push) navigate(routeFor(page2));
 }
 var esc = escapeHtml;
@@ -79,6 +81,7 @@ var errorMessage = (error) => {
   }
   return String(error);
 };
+var isFileConflict = (error) => error?._tag === "FileRevisionConflict" || error?.error?._tag === "FileRevisionConflict" || /changed on disk|revision conflict/i.test(errorMessage(error));
 var gitController = createGitController({
   query: $,
   queryAll: $$,
@@ -256,10 +259,13 @@ var filesController = new FilesController(
     projects: () => projects,
     loadTree: (project, force) => workbench.fileTree(project).load({ force }),
     readFile: (project, path, force = false) => workbench.readFile(project, path).load({ force }),
+    fileRevision: (project, path) => workbench.fileRevision(project, path),
     writeFile: (input) => workbench.writeFile(input),
     editorText: filesEditorText,
+    replaceEditor: replaceFilesEditorText,
     openEditor: (content, path, changed) => openFilesEditor($("#editor"), content, path, changed),
     confirmDiscard: () => confirm("Discard unsaved changes?"),
+    isConflict: isFileConflict,
     navigate,
     schedule: (callback, delay) => setTimeout(callback, delay),
     cancelScheduled: (handle) => clearTimeout(handle),
@@ -268,6 +274,22 @@ var filesController = new FilesController(
   filesView
 );
 filesView.attach(filesController);
+var fileMonitorBusy = false;
+async function refreshOpenFile() {
+  if (fileMonitorBusy || document.visibilityState === "hidden" || $("#files").classList.contains("hidden"))
+    return;
+  fileMonitorBusy = true;
+  try {
+    await workbench.refreshInvalidations();
+    await filesController.checkExternalChange();
+  } catch {
+  } finally {
+    fileMonitorBusy = false;
+  }
+}
+setInterval(() => void refreshOpenFile(), 1500);
+addEventListener("focus", () => void refreshOpenFile());
+document.addEventListener("visibilitychange", () => void refreshOpenFile());
 var currentProject = () => filesController.project;
 function renderProjectMenu() {
   filesController.syncProjects(projects);

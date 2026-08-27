@@ -286,9 +286,84 @@ pre {
 #saveFile:disabled {
   opacity: 0.4;
 }
+.fileconflict {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  color: #f0d47b;
+  background: #3b2f13;
+  border-bottom: 1px solid #7a6122;
+  font-size: 12px;
+}
+.fileconflict.hidden {
+  display: none;
+}
+.fileconflictactions {
+  display: flex;
+  gap: 6px;
+}
+.fileconflictactions button {
+  padding: 4px 8px;
+  color: #fff;
+  background: #27221a;
+  border: 1px solid #806a32;
+}
+.fileconflictdialog {
+  width: min(1100px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  color: #e6edf3;
+  background: #161b22;
+  border: 1px solid var(--line);
+}
+.fileconflictdialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.fileconflictdialog h2,
+.fileconflictdialog h3 {
+  margin: 0;
+}
+.fileconflictdialog small {
+  color: var(--muted);
+}
+.fileconflictcompare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-height: calc(100vh - 110px);
+  overflow: auto;
+}
+.fileconflictcompare section {
+  min-width: 0;
+  padding: 12px;
+}
+.fileconflictcompare section + section {
+  border-left: 1px solid var(--line);
+}
+.fileconflictcompare h3 {
+  padding-bottom: 8px;
+  font-size: 12px;
+}
+.fileconflictcompare pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    12px/1.5 ui-monospace,
+    monospace;
+}
 #editor {
   height: calc(100% - 32px);
   min-height: 300px;
+}
+.viewer.file-conflicted #editor {
+  height: calc(100% - 76px);
 }
 .cm-editor {
   height: 100%;
@@ -296,6 +371,19 @@ pre {
 }
 .cm-focused {
   outline: none !important;
+}
+@media (max-width: 700px) {
+  .fileconflict {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .fileconflictcompare {
+    grid-template-columns: 1fr;
+  }
+  .fileconflictcompare section + section {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
 }
 #media img,
 #media iframe {

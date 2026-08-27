@@ -214,6 +214,23 @@ async function readProjectFile(root, relative) {
     editable: !sensitivePath(relative),
   };
 }
+async function readProjectFileRevision(root, relative) {
+  const target = safePath(root, relative);
+  const real = await realContained(root, target);
+  const st = await fsp.stat(real);
+  if (!st.isFile())
+    throw Object.assign(new Error("Not a file"), { status: 400 });
+  if (st.size > TEXT_LIMIT)
+    throw Object.assign(new Error("File is too large for text preview"), {
+      status: 413,
+    });
+  return {
+    path: relative,
+    revision: fileVersion(await fsp.readFile(real)),
+    size: st.size,
+    mtime: st.mtime.toISOString(),
+  };
+}
 async function writeProjectFile(root, relative, body) {
   if (!relative || sensitivePath(relative))
     throw Object.assign(new Error("This path is not editable"), {
@@ -239,7 +256,7 @@ async function writeProjectFile(root, relative, body) {
   if (body.version && body.version !== fileVersion(before))
     throw Object.assign(
       new Error("File changed on disk; reload before saving"),
-      { status: 409 },
+      { status: 409, _tag: "FileRevisionConflict" },
     );
   const temp = path.join(
     path.dirname(real),
@@ -702,6 +719,8 @@ const typedApi = await makeTypedApi(
       contentSearch: (input, options) => platform.contentSearch(input, options),
       gitInfo,
       readFile: (project, relative) => readProjectFile(project.root, relative),
+      fileRevision: (project, relative) =>
+        readProjectFileRevision(project.root, relative),
       writeFile: (project, relative, body) =>
         writeProjectFile(project.root, relative, body),
     },

@@ -15674,6 +15674,12 @@ var FileEntry = external_exports.object({
   size: external_exports.number().int().nonnegative().optional(),
   mtime: external_exports.string().optional()
 });
+var FileRevision = external_exports.object({
+  path: external_exports.string(),
+  revision: external_exports.string(),
+  size: external_exports.number().int().nonnegative(),
+  mtime: external_exports.string()
+});
 var GitCommit = external_exports.object({
   hash: external_exports.string(),
   shortHash: external_exports.string(),
@@ -15905,6 +15911,11 @@ var WorkbenchRpc = api("workbench", {
         editable: external_exports.boolean().optional(),
         mtime: external_exports.string().optional()
       }),
+      error: DomainError
+    }),
+    revision: query({
+      input: ProjectPath,
+      output: FileRevision,
       error: DomainError
     }),
     write: mutation({
@@ -16311,6 +16322,7 @@ var makeTypedApi = async (backend, workflowBackend2) => {
     files: {
       tree: ({ project, path: path5 }) => promise2(async () => [...await backend.fileTree(project, path5)]),
       read: ({ project, path: path5 }) => promise2(() => backend.readFile(project, path5)),
+      revision: ({ project, path: path5 }) => promise2(() => backend.fileRevision(project, path5)),
       write: (input) => promise2(async () => {
         const result = await backend.writeFile(input);
         invalidate([
@@ -18326,6 +18338,7 @@ var kyootBackend = (services, runs, invokePlatform) => ({
     return (await services.tree(requireProject(services.projects, project).root, path5)).entries;
   },
   readFile: (project, path5) => services.readFile(requireProject(services.projects, project), path5),
+  fileRevision: (project, path5) => services.fileRevision(requireProject(services.projects, project), path5),
   async writeFile(input) {
     const result = await services.writeFile(
       requireProject(services.projects, input.project),

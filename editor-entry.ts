@@ -1,5 +1,5 @@
 import { EditorView, basicSetup } from "codemirror";
-import { EditorState, Compartment } from "@codemirror/state";
+import { EditorSelection, EditorState, Compartment } from "@codemirror/state";
 import { keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
@@ -107,7 +107,8 @@ const synthwaveHighlight = HighlightStyle.define([
 const languageSlot = new Compartment();
 let view: EditorView | null = null,
   onChange: (text: string) => void = () => {},
-  languageRequest = 0;
+  languageRequest = 0,
+  suppressChange = false;
 function languageFor(filename) {
   const ext = (filename.toLowerCase().match(/\.([^.\/]+)$/) || [])[1] || "";
   return (
@@ -143,7 +144,8 @@ export async function openEditor(
           languageSlot.of([]),
           keymap.of([indentWithTab]),
           EditorView.updateListener.of((u) => {
-            if (u.docChanged) onChange(u.state.doc.toString());
+            if (u.docChanged && !suppressChange)
+              onChange(u.state.doc.toString());
           }),
         ],
       }),
@@ -162,6 +164,29 @@ export async function openEditor(
 }
 export function editorText() {
   return view?.state.doc.toString() || "";
+}
+export function replaceEditorText(content: string) {
+  if (!view || view.state.doc.toString() === content) return;
+  const { anchor, head } = view.state.selection.main;
+  const scrollTop = view.scrollDOM.scrollTop;
+  const scrollLeft = view.scrollDOM.scrollLeft;
+  suppressChange = true;
+  try {
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: content },
+      selection: EditorSelection.single(
+        Math.min(anchor, content.length),
+        Math.min(head, content.length),
+      ),
+    });
+  } finally {
+    suppressChange = false;
+  }
+  requestAnimationFrame(() => {
+    if (!view) return;
+    view.scrollDOM.scrollTop = scrollTop;
+    view.scrollDOM.scrollLeft = scrollLeft;
+  });
 }
 export function focusEditor() {
   view?.focus();

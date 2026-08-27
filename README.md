@@ -1,18 +1,16 @@
-# Kyoot Workbench
+# Bash Workbench
 
-A standalone Bash.tv coding workbench built on the vendored Kyoot effect, RPC, sync, query-cache, Pi, and workflow packages. The repository is one pinned Node/npm workspace with one deterministic install and lockfile.
+A standalone Bash.tv coding workbench. The repository is one pinned Node/npm workspace with one deterministic install and lockfile.
 
 Everything required to build and run the application lives in this directory:
 
 ```text
-frontend/                 maintained TypeScript browser source
-orchestrator-kyoot/       durable run and workflow engines
-kyoot/                    complete vendored Kyoot source workspace
-public/                   generated browser-native deployment assets
-server.mjs                production HTTP entrypoint
+frontend/     maintained TypeScript browser source
+public/       generated browser-native deployment assets
+server.mjs    production HTTP entrypoint
 ```
 
-No sibling Kyoot checkout is required. The orchestrator was folded into this standalone source tree after commit `51fbe648a79fb063765852556db32887e6feae17`; its former nested repository metadata is intentionally not part of deployments.
+No sibling checkout is required. All build and runtime source is in this repository.
 
 ## Deploy to a new Bash space
 
@@ -38,11 +36,7 @@ To create a copyable archive:
 bash ./bootstrap.sh archive
 ```
 
-The server automatically registers its installation directory as the first project:
-
-```text
-kyoot-workbench — Kyoot Workbench
-```
+The server automatically registers its installation directory as the first project, named Bash Workbench.
 
 A missing project registry is valid; additional projects can be supplied through `BASH_WORKBENCH_CONFIG` or `~/.local/share/bash-workbench/projects.json`.
 
@@ -65,7 +59,7 @@ bash ./bootstrap.sh install         # install in place, build, and provision pri
 bash ./bootstrap.sh serve           # foreground production runtime for a detached/tmux agent job
 bash ./bootstrap.sh verify          # health, self-registration, archive, and confinement checks
 bash ./bootstrap.sh verify --live   # additionally execute one bounded real bashtv/free turn
-bash ./bootstrap.sh archive         # create ../kyoot-workbench-standalone.zip from Git HEAD
+bash ./bootstrap.sh archive         # create a standalone ZIP from Git HEAD
 ```
 
 ## WebMCP
@@ -78,7 +72,7 @@ The browser UI exposes typed Workbench queries and mutations as browser-native W
 mise exec -- npm ci            # install the entire workspace from package-lock.json
 mise exec -- npm run build     # generate browser and typed-server assets
 mise exec -- npm run check     # frontend, syntax, and portability checks
-mise exec -- npm run check:all # Workbench + Kyoot + orchestrator checks
+mise exec -- npm run check:all # complete Workbench and orchestrator checks
 ```
 
 The root `mise.toml` pins Node `24.19.0`; npm `11.17.0` is supplied by that toolchain and owns the complete workspace through one root `package-lock.json`. Generated `typed-server.mjs` targets Node 20 and production uses `/usr/bin/node` for Bash.tv/Pi compatibility.

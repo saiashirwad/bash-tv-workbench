@@ -3,7 +3,7 @@
 Paste the prompt below into a new Bash.tv coding-agent session.
 
 ````text
-Start the latest Kyoot Workbench from this repository:
+Start the latest Bash Workbench from this repository:
 
 https://github.com/saiashirwad/bash-tv-workbench.git
 

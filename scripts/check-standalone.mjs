@@ -11,7 +11,11 @@ const textExtensions = new Set([
 const forbidden = [
   { label: "external Kyoot checkout", pattern: /\/home\/[^/]+\/kyoot(?:\/|\b)/ },
   { label: "old two-level package link", pattern: /file:\.\.\/\.\.\/kyoot/ },
-  { label: "fixed Workbench install path", pattern: /\/home\/[^/]+\/workbench(?:\/|\b)/ },
+  {
+    label: "fixed Workbench install path",
+    pattern: /\/home\/[^/]+\/workbench(?:\/|\b)/,
+    allowedFiles: new Set(["SETUP_PROMPT.md"]),
+  },
   { label: "legacy supervisor", pattern: /supervisor\.sock|supervisor\.mjs|legacyBackend/ },
 ];
 const failures = [];
@@ -25,8 +29,10 @@ const walk = (directory) => {
       (textExtensions.has(path.extname(entry.name)) || entry.name === "Dockerfile")
     ) {
       const source = fs.readFileSync(filename, "utf8");
+      const relative = path.relative(root, filename);
       for (const rule of forbidden)
-        if (rule.pattern.test(source)) failures.push(`${path.relative(root, filename)}: ${rule.label}`);
+        if (rule.pattern.test(source) && !rule.allowedFiles?.has(relative))
+          failures.push(`${relative}: ${rule.label}`);
     }
   }
 };

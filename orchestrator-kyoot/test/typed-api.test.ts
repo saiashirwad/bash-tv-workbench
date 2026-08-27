@@ -5,22 +5,25 @@ import { fetchTransport } from "@kyoot/rpc/http";
 import { make } from "@kyoot/sync";
 import { fromRpc, SyncRpc } from "@kyoot/sync/rpc";
 import { Kyoot, Fail } from "kyoot";
-import {
-  WorkbenchClient,
-  type Run,
-  type RunSummary,
-} from "@kyoot/workbench-protocol";
-import {
-  makeTypedApi,
-  summarizeRun,
-  type WorkbenchBackend,
-} from "../src/typed-api.ts";
+import { WorkbenchClient, type Run, type RunSummary } from "@kyoot/workbench-protocol";
+import { makeTypedApi, summarizeRun, type WorkbenchBackend } from "../src/typed-api.ts";
 
 const now = new Date(0).toISOString();
 const runs = new Map<string, Run>();
+const projects = new Map([["kyoot", { id: "kyoot", name: "Kyoot", writable: true }]]);
 const backend: WorkbenchBackend = {
   listRuns: async () => [...runs.values()].map(summarizeRun),
-  listProjects: async () => [{ id: "kyoot", name: "Kyoot", writable: true }],
+  listProjects: async () => [...projects.values()],
+  registerProject: async (input) => {
+    const project = {
+      id: input.id || "new-project",
+      name: input.name || "New Project",
+      root: input.root,
+      writable: true,
+    };
+    projects.set(project.id, project);
+    return project;
+  },
   liveSession: async (input) => ({ id: "live", ...input }),
   getRun: async (id) => runs.get(id)!,
   createRun: async ({ project, prompt, title }) => {
@@ -39,9 +42,7 @@ const backend: WorkbenchBackend = {
   messageRun: async ({ id }) => ({ ...runs.get(id)!, status: "running" }),
   compactRun: async (id) => ({ ...runs.get(id)!, status: "compacting" }),
   stopRun: async (id) => ({ ...runs.get(id)!, status: "cancelled" }),
-  fileTree: async () => [
-    { name: "README.md", path: "README.md", type: "file", size: 5 },
-  ],
+  fileTree: async () => [{ name: "README.md", path: "README.md", type: "file", size: 5 }],
   readFile: async (_project, path) => ({
     path,
     content: "hello",
@@ -66,10 +67,7 @@ const backend: WorkbenchBackend = {
   gitDiff: async (_project, commit) => ({ commit, diff: "" }),
 };
 
-const transportFor = (
-  app: (request: Request) => Promise<Response>,
-  path: string,
-) =>
+const transportFor = (app: (request: Request) => Promise<Response>, path: string) =>
   fetchTransport({
     url: `https://workbench.test/${path}`,
     fetch: async (input, init) => app(new Request(input, init)),
@@ -102,8 +100,7 @@ test("RPC request cancellation reaches typed platform operations", async () => {
     invokePlatform: (_operation, _input, options) => {
       operationSignal = options?.signal;
       return new Promise((_resolve, reject) => {
-        const abort = () =>
-          reject(options?.signal?.reason ?? new Error("aborted"));
+        const abort = () => reject(options?.signal?.reason ?? new Error("aborted"));
         options?.signal?.addEventListener("abort", abort, { once: true });
       });
     },
@@ -135,8 +132,7 @@ test("RPC request cancellation reaches typed content search", async () => {
     contentSearch: (_input, options) => {
       searchSignal = options?.signal;
       return new Promise((_resolve, reject) => {
-        const abort = () =>
-          reject(options?.signal?.reason ?? new Error("aborted"));
+        const abort = () => reject(options?.signal?.reason ?? new Error("aborted"));
         options?.signal?.addEventListener("abort", abort, { once: true });
       });
     },
@@ -165,10 +161,9 @@ test("an external agent creation appears in an already-connected Workbench run c
   runs.clear();
   const api = await makeTypedApi(backend);
   const externalRpc = transportFor(api.workbenchApp, "rpc");
-  const workbenchSync = make(
-    fromRpc(client(SyncRpc), transportFor(api.syncApp, "sync")),
-    { reconnectMs: 1 },
-  );
+  const workbenchSync = make(fromRpc(client(SyncRpc), transportFor(api.syncApp, "sync")), {
+    reconnectMs: 1,
+  });
   await workbenchSync.start();
 
   const observed: RunSummary[][] = [];
@@ -197,6 +192,34 @@ test("an external agent creation appears in an already-connected Workbench run c
   workbenchSync.stop();
 });
 
+test("a registered project appears in an already-connected Workbench project collection", async () => {
+  projects.clear();
+  projects.set("kyoot", { id: "kyoot", name: "Kyoot", writable: true });
+  const api = await makeTypedApi(backend);
+  const externalRpc = transportFor(api.workbenchApp, "rpc");
+  const workbenchSync = make(fromRpc(client(SyncRpc), transportFor(api.syncApp, "sync")), {
+    reconnectMs: 1,
+  });
+  await workbenchSync.start();
+
+  await Kyoot.runPromise(
+    WorkbenchClient.projects
+      .register({
+        id: "user-app",
+        name: "User App",
+        root: "/home/bashtv/user-app",
+      })
+      .pipe(provide(externalRpc), Fail.orThrow),
+  );
+
+  const collection = workbenchSync.collection("projects");
+  const deadline = Date.now() + 1_000;
+  while (!collection.get("user-app") && Date.now() < deadline)
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(collection.get("user-app")?.name, "User App");
+  workbenchSync.stop();
+});
+
 test("typed Workbench RPC and sync collections share one backend", async () => {
   runs.clear();
   const api = await makeTypedApi(backend);
@@ -213,10 +236,7 @@ test("typed Workbench RPC and sync collections share one backend", async () => {
       .pipe(provide(rpcTransport), Fail.orThrow),
   );
   await new Promise((resolve) => setTimeout(resolve, 10));
-  assert.equal(
-    sync.collection<RunSummary>("runs").get(run.id)?.promptPreview,
-    "test",
-  );
+  assert.equal(sync.collection<RunSummary>("runs").get(run.id)?.promptPreview, "test");
   const live = await Kyoot.runPromise(
     WorkbenchClient.live
       .session({ messages: true, trajectory: false })
@@ -230,9 +250,7 @@ test("typed Workbench RPC and sync collections share one backend", async () => {
       .pipe(provide(rpcTransport), Fail.orThrow),
   );
   const invalidations = await Kyoot.runPromise(
-    WorkbenchClient.invalidations
-      .since({ after: 0 })
-      .pipe(provide(rpcTransport), Fail.orThrow),
+    WorkbenchClient.invalidations.since({ after: 0 }).pipe(provide(rpcTransport), Fail.orThrow),
   );
   assert.deepEqual(invalidations.items[0]?.keys, [
     ["file", "kyoot", "README.md"],

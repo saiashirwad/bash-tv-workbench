@@ -78,6 +78,15 @@ export const Project = z.object({
   writable: z.boolean(),
 });
 export type Project = z.output<typeof Project>;
+export const RegisterProjectInput = z.object({
+  root: z.string().min(1),
+  id: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9._-]{0,63}$/)
+    .optional(),
+  name: z.string().min(1).max(100).optional(),
+});
+export type RegisterProjectInput = z.output<typeof RegisterProjectInput>;
 export const FileEntry = z.object({
   name: z.string(),
   path: z.string(),
@@ -259,6 +268,11 @@ export const WorkbenchRpc = api("workbench", {
   },
   projects: {
     list: query({ input: Empty, output: z.array(Project) }),
+    register: mutation({
+      input: RegisterProjectInput,
+      output: Project,
+      error: DomainError,
+    }),
   },
   live: {
     session: query({

@@ -36,7 +36,7 @@ Global options:
 
 Core commands:
   status [--wait]
-  projects list
+  projects list|register
   runs list|get|create|batch|message|stop|compact|events|watch|wait
   workflows list|get|create|add-tasks|cancel|cancel-task|retry-task|events|wait
   trajectory list|get
@@ -54,6 +54,7 @@ Core commands:
 
 Examples:
   bash-workbench projects list
+  bash-workbench projects register --root /home/bashtv/my-app --name "My App"
   bash-workbench runs create --project app --title "Fix tests" --prompt "Fix the failing tests"
   bash-workbench runs wait RUN_ID
   bash-workbench runs events RUN_ID --tail 50
@@ -68,6 +69,8 @@ Use '-' as a file name to read JSON or text from stdin.
 
 const COMMAND_HELP = {
   status: `Usage: bash-workbench status [--wait] [--wait-timeout MS] [--interval MS]\n\nCheck Workbench health. --wait retries until the server is ready.\n`,
+  projects: `Usage: bash-workbench projects <list|register> [options]\n`,
+  "projects register": `Usage: bash-workbench projects register --root PATH [--name TEXT] [--id ID]\n\nPersist a project and make it visible in the running Workbench. The name defaults to the directory name, and the ID defaults to a lowercase name slug.\n`,
   runs: `Usage: bash-workbench runs <list|create|batch|get|message|stop|compact|events|watch|wait> [options]\n\nUse "bash-workbench runs <command> --help" for command details.\n`,
   "runs create": `Usage: bash-workbench runs create [--project ID] (--prompt TEXT | --prompt-file FILE) [--title TEXT]\n\nCreate one agent run. The first registered project is used when --project is omitted.\n`,
   "runs batch": `Usage: bash-workbench runs batch (--input JSON | --file FILE) [--project ID] [--concurrency N] [--full]\n\nCreate up to 50 independent agent runs. Input is an array or an object with a runs array. Calls run concurrently.\n`,
@@ -767,8 +770,15 @@ async function dispatch() {
   if (!group || group === "help") return { help: HELP };
   if (flag("help")) return { help: helpFor(group, action) };
   if (group === "status") return healthCommand();
-  if (group === "projects" && action === "list")
-    return client.rpc("projects.list", {});
+  if (group === "projects") {
+    if (!action || action === "list") return client.rpc("projects.list", {});
+    if (action === "register")
+      return client.rpc("projects.register", {
+        root: required("root"),
+        ...(option("name") ? { name: String(option("name")) } : {}),
+        ...(option("id") ? { id: String(option("id")) } : {}),
+      });
+  }
   if (group === "runs") return runCommand(action || "list");
   if (group === "workflows") return workflowCommand(action || "list");
   if (group === "trajectory") {

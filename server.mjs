@@ -8,7 +8,10 @@ import { createReadStream } from "node:fs";
 import { createGzip } from "node:zlib";
 import { Readable } from "node:stream";
 import crypto from "node:crypto";
-import { loadProjects } from "./project-config.mjs";
+import {
+  loadProjects,
+  registerProject as persistProject,
+} from "./project-config.mjs";
 import { makeWorkbenchPlatform } from "./workbench-platform.mjs";
 import {
   collaboratorTokensFromEnvironment,
@@ -684,6 +687,11 @@ const typedApi = await makeTypedApi(
   kyootBackend(
     {
       projects: PROJECTS,
+      registerProject: async (input) => {
+        const registered = persistProject(input);
+        PROJECTS.set(registered.id, registered);
+        return registered;
+      },
       liveSession: ({ messages, trajectory }) =>
         sessionData(messages, trajectory),
       liveSessionPage: ({ cursor, limit }) => liveSessionPage(cursor, limit),

@@ -12,7 +12,7 @@
     "/runs.js": "/runs.21878071527da026.js",
     "/trajectory.js": "/trajectory.28d923fcd34c0a35.js",
     "/webmcp.js": "/webmcp.33dba7a68120ac28.js",
-    "/workbench-store.js": "/workbench-store.1d37d36c23182244.js",
+    "/workbench-store.js": "/workbench-store.f65bcd5c8d6f5c33.js",
     "/workflows.js": "/workflows.ca6b0354582368c2.js"
   },
   "shell": [
@@ -33,7 +33,7 @@
     "/webmcp.js",
     "/webmcp.33dba7a68120ac28.js",
     "/workbench-store.js",
-    "/workbench-store.1d37d36c23182244.js",
+    "/workbench-store.f65bcd5c8d6f5c33.js",
     "/page.mjs",
     "/auth.css",
     "/bash-theme.css",

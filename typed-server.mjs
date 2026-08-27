@@ -15662,6 +15662,11 @@ var Project = external_exports.object({
   root: external_exports.string().optional(),
   writable: external_exports.boolean()
 });
+var RegisterProjectInput = external_exports.object({
+  root: external_exports.string().min(1),
+  id: external_exports.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/).optional(),
+  name: external_exports.string().min(1).max(100).optional()
+});
 var FileEntry = external_exports.object({
   name: external_exports.string(),
   path: external_exports.string(),
@@ -15829,7 +15834,12 @@ var WorkbenchRpc = api("workbench", {
     })
   },
   projects: {
-    list: query({ input: Empty, output: external_exports.array(Project) })
+    list: query({ input: Empty, output: external_exports.array(Project) }),
+    register: mutation({
+      input: RegisterProjectInput,
+      output: Project,
+      error: DomainError
+    })
   },
   live: {
     session: query({
@@ -16096,6 +16106,12 @@ var putWorkflow = (workflow) => ({
   key: workflow.id,
   value: workflow
 });
+var putProject = (project) => ({
+  collection: "projects",
+  operation: "put",
+  key: project.id,
+  value: project
+});
 var domainError = (error52) => error52 && typeof error52 === "object" && "_tag" in error52 ? error52 : {
   _tag: "WorkbenchError",
   message: error52 instanceof Error ? error52.message : String(error52)
@@ -16124,21 +16140,13 @@ var makeTypedApi = async (backend, workflowBackend2) => {
     async apply(mutation2) {
       switch (mutation2.type) {
         case "runs/create":
-          return mutationResult(
-            await backend.createRun(mutation2.input)
-          );
+          return mutationResult(await backend.createRun(mutation2.input));
         case "runs/message":
-          return mutationResult(
-            await backend.messageRun(mutation2.input)
-          );
+          return mutationResult(await backend.messageRun(mutation2.input));
         case "runs/compact":
-          return mutationResult(
-            await backend.compactRun(mutation2.input.id)
-          );
+          return mutationResult(await backend.compactRun(mutation2.input.id));
         case "runs/stop":
-          return mutationResult(
-            await backend.stopRun(mutation2.input.id)
-          );
+          return mutationResult(await backend.stopRun(mutation2.input.id));
         case "files/write": {
           const input = mutation2.input;
           const result = await backend.writeFile(input);
@@ -16150,55 +16158,37 @@ var makeTypedApi = async (backend, workflowBackend2) => {
           return { changes: [], result };
         }
         case "workflows/create": {
-          if (!workflowBackend2)
-            throw new Error("Workflow orchestration is unavailable");
-          const workflow = await workflowBackend2.create(
-            mutation2.input
-          );
+          if (!workflowBackend2) throw new Error("Workflow orchestration is unavailable");
+          const workflow = await workflowBackend2.create(mutation2.input);
           return { changes: [putWorkflow(workflow)], result: workflow };
         }
         case "workflows/add-tasks": {
-          if (!workflowBackend2)
-            throw new Error("Workflow orchestration is unavailable");
+          if (!workflowBackend2) throw new Error("Workflow orchestration is unavailable");
           const input = mutation2.input;
-          const tasks = await workflowBackend2.addTasks(
-            input.workflowId,
-            input.tasks
-          );
+          const tasks = await workflowBackend2.addTasks(input.workflowId, input.tasks);
           return {
             changes: [putWorkflow(await workflowBackend2.get(input.workflowId))],
             result: tasks
           };
         }
         case "workflows/cancel": {
-          if (!workflowBackend2)
-            throw new Error("Workflow orchestration is unavailable");
-          const workflow = await workflowBackend2.cancel(
-            mutation2.input.id
-          );
+          if (!workflowBackend2) throw new Error("Workflow orchestration is unavailable");
+          const workflow = await workflowBackend2.cancel(mutation2.input.id);
           return { changes: [putWorkflow(workflow)], result: workflow };
         }
         case "workflows/cancel-task": {
-          if (!workflowBackend2)
-            throw new Error("Workflow orchestration is unavailable");
+          if (!workflowBackend2) throw new Error("Workflow orchestration is unavailable");
           const input = mutation2.input;
-          const task = await workflowBackend2.cancelTask(
-            input.workflowId,
-            input.taskId
-          );
+          const task = await workflowBackend2.cancelTask(input.workflowId, input.taskId);
           return {
             changes: [putWorkflow(await workflowBackend2.get(input.workflowId))],
             result: task
           };
         }
         case "workflows/retry-task": {
-          if (!workflowBackend2)
-            throw new Error("Workflow orchestration is unavailable");
+          if (!workflowBackend2) throw new Error("Workflow orchestration is unavailable");
           const input = mutation2.input;
-          const task = await workflowBackend2.retryTask(
-            input.workflowId,
-            input.taskId
-          );
+          const task = await workflowBackend2.retryTask(input.workflowId, input.taskId);
           return {
             changes: [putWorkflow(await workflowBackend2.get(input.workflowId))],
             result: task
@@ -16237,8 +16227,7 @@ var makeTypedApi = async (backend, workflowBackend2) => {
   };
   if (workflowBackend2)
     workflowBackend2.subscribe((event) => {
-      if (!event.type.startsWith("workflow.") && !event.type.startsWith("task."))
-        return;
+      if (!event.type.startsWith("workflow.") && !event.type.startsWith("task.")) return;
       void workflowBackend2.get(event.workflowId).then((workflow) => {
         sync.commit([putWorkflow(workflow)]);
       }).catch(() => {
@@ -16296,18 +16285,21 @@ var makeTypedApi = async (backend, workflowBackend2) => {
       )
     },
     projects: {
-      list: () => promise2(async () => [...await backend.listProjects()])
+      list: () => promise2(async () => [...await backend.listProjects()]),
+      register: (input) => promise2(async () => {
+        const project = await backend.registerProject(input);
+        sync.commit([putProject(project)]);
+        return project;
+      })
     },
     live: {
       session: (input) => promise2(() => backend.liveSession(input)),
       page: (input) => promise2(() => {
-        if (!backend.liveSessionPage)
-          throw new Error("Live session paging is unavailable");
+        if (!backend.liveSessionPage) throw new Error("Live session paging is unavailable");
         return backend.liveSessionPage(input);
       }),
       trajectory: (input) => promise2(() => {
-        if (!backend.liveTrajectory)
-          throw new Error("Live trajectory paging is unavailable");
+        if (!backend.liveTrajectory) throw new Error("Live trajectory paging is unavailable");
         return backend.liveTrajectory(input);
       }),
       trajectoryEvent: ({ id: id2 }) => promise2(() => {
@@ -16335,8 +16327,7 @@ var makeTypedApi = async (backend, workflowBackend2) => {
         })
       ]),
       contentSearch: (input) => promise2((signal) => {
-        if (!backend.contentSearch)
-          throw new Error("Project content search is unavailable");
+        if (!backend.contentSearch) throw new Error("Project content search is unavailable");
         return backend.contentSearch(input, { signal });
       })
     },
@@ -16345,46 +16336,37 @@ var makeTypedApi = async (backend, workflowBackend2) => {
         const info2 = await backend.gitInfo(project, commit);
         return { ...info2, commits: [...info2.commits] };
       }),
-      commits: ({ project, limit }) => promise2(async () => [
-        ...await backend.gitCommits(project, limit ?? 50)
-      ]),
+      commits: ({ project, limit }) => promise2(async () => [...await backend.gitCommits(project, limit ?? 50)]),
       diff: ({ project, commit }) => promise2(() => backend.gitDiff(project, commit))
     },
     workflows: {
       list: () => promise2(async () => [...await workflowBackend2?.list() ?? []]),
       get: ({ id: id2 }) => promise2(async () => {
-        if (!workflowBackend2)
-          throw new Error("Workflow orchestration is unavailable");
+        if (!workflowBackend2) throw new Error("Workflow orchestration is unavailable");
         return workflowBackend2.get(id2);
       }),
       create: (input) => promise2(async () => {
-        if (!workflowBackend2)
-          throw new Error("Workflow orchestration is unavailable");
+        if (!workflowBackend2) throw new Error("Workflow orchestration is unavailable");
         return workflowBackend2.create(input);
       }),
       addTasks: ({ workflowId, tasks }) => promise2(async () => {
-        if (!workflowBackend2)
-          throw new Error("Workflow orchestration is unavailable");
+        if (!workflowBackend2) throw new Error("Workflow orchestration is unavailable");
         return [...await workflowBackend2.addTasks(workflowId, tasks)];
       }),
       cancel: ({ id: id2 }) => promise2(async () => {
-        if (!workflowBackend2)
-          throw new Error("Workflow orchestration is unavailable");
+        if (!workflowBackend2) throw new Error("Workflow orchestration is unavailable");
         return workflowBackend2.cancel(id2);
       }),
       cancelTask: ({ workflowId, taskId }) => promise2(async () => {
-        if (!workflowBackend2)
-          throw new Error("Workflow orchestration is unavailable");
+        if (!workflowBackend2) throw new Error("Workflow orchestration is unavailable");
         return workflowBackend2.cancelTask(workflowId, taskId);
       }),
       retryTask: ({ workflowId, taskId }) => promise2(async () => {
-        if (!workflowBackend2)
-          throw new Error("Workflow orchestration is unavailable");
+        if (!workflowBackend2) throw new Error("Workflow orchestration is unavailable");
         return workflowBackend2.retryTask(workflowId, taskId);
       }),
       events: (input) => promise2(async () => {
-        if (!workflowBackend2)
-          throw new Error("Workflow orchestration is unavailable");
+        if (!workflowBackend2) throw new Error("Workflow orchestration is unavailable");
         const page = await workflowBackend2.events(input);
         return { ...page, events: [...page.events] };
       }),
@@ -16408,9 +16390,7 @@ var makeTypedApi = async (backend, workflowBackend2) => {
             void workflowBackend2.events({ ...input, limit: 5e3 }).then((page) => {
               const existing = new Set(queued.map((event) => event.cursor));
               queued.unshift(
-                ...page.events.filter(
-                  (event) => matches(event) && !existing.has(event.cursor)
-                )
+                ...page.events.filter((event) => matches(event) && !existing.has(event.cursor))
               );
               queued.sort((a, b) => a.cursor - b.cursor);
               wake();
@@ -16437,8 +16417,7 @@ var makeTypedApi = async (backend, workflowBackend2) => {
     },
     platform: {
       call: ({ operation, input }) => promise2(async (signal) => {
-        if (!backend.invokePlatform)
-          throw new Error("Platform operations are unavailable");
+        if (!backend.invokePlatform) throw new Error("Platform operations are unavailable");
         return backend.invokePlatform(operation, input ?? {}, { signal });
       })
     },
@@ -18307,6 +18286,10 @@ var kyootBackend = (services, runs, invokePlatform) => ({
     root,
     writable: true
   })),
+  async registerProject(input) {
+    const { id: id2, name, root } = await services.registerProject(input);
+    return { id: id2, name, root, writable: true };
+  },
   liveSession: (input) => services.liveSession(input),
   liveSessionPage: (input) => services.liveSessionPage(input),
   liveTrajectory: (input) => services.liveTrajectory(input),

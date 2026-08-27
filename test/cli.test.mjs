@@ -72,6 +72,53 @@ test("CLI waits for health without parsing its printed JSON", async (t) => {
   assert.equal(attempts, 3);
 });
 
+test("CLI registers a user project through typed RPC", async (t) => {
+  const server = http.createServer(async (request, response) => {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    const call = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    assert.equal(call.procedure, "projects.register");
+    assert.deepEqual(call.input, {
+      root: "/home/bashtv/weather-app",
+      id: "weather-app",
+      name: "Weather App",
+    });
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(
+      JSON.stringify({
+        version: 1,
+        id: call.id,
+        ok: true,
+        output: { ...call.input, writable: true },
+      }),
+    );
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const address = server.address();
+
+  const { stdout } = await execute(process.execPath, [
+    cli,
+    "projects",
+    "register",
+    "--root",
+    "/home/bashtv/weather-app",
+    "--id",
+    "weather-app",
+    "--name",
+    "Weather App",
+    "--url",
+    `http://127.0.0.1:${address.port}`,
+    "--compact",
+  ]);
+  assert.deepEqual(JSON.parse(stdout), {
+    root: "/home/bashtv/weather-app",
+    id: "weather-app",
+    name: "Weather App",
+    writable: true,
+  });
+});
+
 test("CLI creates a bounded batch of runs concurrently", async (t) => {
   let active = 0;
   let maximumActive = 0;

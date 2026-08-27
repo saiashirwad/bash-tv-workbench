@@ -36,6 +36,10 @@ test("one-paste setup clones GitHub and keeps open experimental access", async (
   assert.doesNotMatch(prompt, /until .*grep/);
   assert.match(prompt, /If a required command fails, stop/);
   assert.match(prompt, /Use `runs batch` for independent parallel tasks/);
+  assert.match(prompt, /separate development tool/);
+  assert.match(prompt, /user's actual project/);
+  assert.match(prompt, /projects register/);
+  assert.match(prompt, /Do not put the user's application in/);
 });
 
 test("space installation uses committed deployment assets", async () => {

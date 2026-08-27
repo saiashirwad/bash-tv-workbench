@@ -37,6 +37,19 @@ $HOME/.local/bin/bw op list
 $HOME/.local/bin/bw op describe workbench_exec
 ```
 
+## Register the user project
+
+Workbench is a background tool. The project that the user wants to build must have a separate directory. Register that directory before you use other Workbench commands for it.
+
+```bash
+$HOME/.local/bin/bw projects register \
+  --root /home/bashtv/my-app \
+  --name "My App" \
+  --id my-app
+```
+
+`--name` and `--id` are optional. The directory name supplies the default name. A lowercase slug of the name supplies the default ID. Registration is persistent and idempotent for the same real directory. It also updates an open Workbench without a restart.
+
 `op list` comes from the platform operation catalog. `op call` gives access to
 every catalog operation. `rpc` gives access to every typed procedure.
 

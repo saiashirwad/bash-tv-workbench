@@ -2,6 +2,7 @@ import type {
   FileEntry,
   GitCommit,
   Project,
+  RegisterProjectInput,
   Run,
   RunSummary,
 } from "@kyoot/workbench-protocol";
@@ -48,6 +49,7 @@ export interface WorkbenchProject {
 }
 export interface WorkbenchServices {
   readonly projects: ReadonlyMap<string, WorkbenchProject>;
+  registerProject(input: RegisterProjectInput): Promise<WorkbenchProject>;
   liveSession(input: {
     readonly messages: boolean;
     readonly trajectory: boolean;
@@ -168,6 +170,10 @@ export const kyootBackend = (
         root,
         writable: true,
       })),
+  async registerProject(input) {
+    const { id, name, root } = await services.registerProject(input);
+    return { id, name, root, writable: true };
+  },
   liveSession: (input) => services.liveSession(input),
   liveSessionPage: (input) => services.liveSessionPage(input),
   liveTrajectory: (input) => services.liveTrajectory(input),

@@ -2,6 +2,8 @@
 
 A standalone Bash.tv coding workbench. The repository is one pinned Node/npm workspace with one deterministic install and lockfile.
 
+Bash Workbench is a background development tool, not the application that a user asks the Bash.tv agent to build. Keep each user project outside the Workbench installation directory, and register it so that it is visible and controllable in the Workbench.
+
 Everything required to build and run the application lives in this directory:
 
 ```text
@@ -37,9 +39,16 @@ To create a copyable archive:
 bash ./bootstrap.sh archive
 ```
 
-The server automatically registers its installation directory as the first project, named Bash Workbench.
+The server registers its own installation directory for Workbench maintenance. This is not the user project. Register the user's actual project after its directory exists:
 
-A missing project registry is valid; additional projects can be supplied through `BASH_WORKBENCH_CONFIG` or `~/.local/share/bash-workbench/projects.json`.
+```bash
+$HOME/.local/bin/bw projects register \
+  --root /home/bashtv/my-app \
+  --name "My App" \
+  --id my-app
+```
+
+Registration updates the running browser and persists the project for the next Workbench start. A missing project registry is valid. Its default path is `~/.local/share/bash-workbench/projects.json`, and `BASH_WORKBENCH_CONFIG` can select a different path.
 
 ## Workbench access mode
 
@@ -79,10 +88,11 @@ operation.
 ```bash
 $HOME/.local/bin/bw status --wait
 $HOME/.local/bin/bw projects list
-$HOME/.local/bin/bw runs create --project bash-workbench --prompt "Fix the failing build"
+$HOME/.local/bin/bw projects register --root /home/bashtv/my-app --name "My App" --id my-app
+$HOME/.local/bin/bw runs create --project my-app --prompt "Fix the failing build"
 $HOME/.local/bin/bw runs batch --file parallel-runs.json --concurrency 2
 $HOME/.local/bin/bw runs watch RUN_ID
-$HOME/.local/bin/bw exec --project bash-workbench -- npm test
+$HOME/.local/bin/bw exec --project my-app -- npm test
 $HOME/.local/bin/bw op list
 ```
 

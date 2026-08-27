@@ -29,7 +29,7 @@ test("one-paste setup clones GitHub and keeps open experimental access", async (
     prompt,
     /https:\/\/github\.com\/saiashirwad\/bash-tv-workbench\.git/,
   );
-  assert.match(prompt, /installs the pinned `mise` binary/);
+  assert.match(prompt, /bash \.\/bootstrap\.sh install/);
   assert.match(prompt, /default experimental open-access mode/);
   assert.match(prompt, /Do not set `BASH_WORKBENCH_AUTH_REQUIRED`/);
 });

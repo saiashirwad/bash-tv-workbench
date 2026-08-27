@@ -16,19 +16,17 @@ No sibling Kyoot checkout is required. The orchestrator was folded into this sta
 
 ## Deploy to a new Bash space
 
-Give the destination coding agent the one-paste prompt in [`SETUP_PROMPT.md`](SETUP_PROMPT.md). The prompt clones the latest `main` branch from `https://github.com/saiashirwad/bash-tv-workbench.git`, or safely fast-forwards an existing clean checkout, then performs the complete setup and acceptance checks.
+Give the destination coding agent the one-paste prompt in [`SETUP_PROMPT.md`](SETUP_PROMPT.md). The prompt clones the latest `main` branch from `https://github.com/saiashirwad/bash-tv-workbench.git`, or safely fast-forwards an existing clean checkout, then installs and opens the Workbench.
 
 The agent-facing lifecycle is:
 
 ```bash
-bash ./bootstrap.sh doctor
-bash ./bootstrap.sh plan
 bash ./bootstrap.sh install
-bash ./bootstrap.sh verify
 # Launch this command using the Bash.tv coding tool's detached/tmux mode:
 bash ./bootstrap.sh serve
-bash ./bootstrap.sh verify --live
 ```
+
+The `verify` and `verify --live` commands are optional release and acceptance checks. Setup does not run them.
 
 `doctor` installs pinned `mise v2026.8.14` into `$HOME/.local/bin/mise` when it is absent, verifies the official binary checksum, and installs Node `24.19.0` from `mise.toml`. `./scripts/setup-space.sh` remains a short alias for `bash ./bootstrap.sh install`. When the artifact was extracted from a Source ZIP rather than cloned, installation initializes an in-place local Git repository with no remote so Source ZIP and Git bundle downloads remain available.
 
@@ -63,7 +61,7 @@ To restore the protected owner/collaborator boundary, start with `BASH_WORKBENCH
 ```bash
 bash ./bootstrap.sh doctor          # verify Bash.tv Pi; install mise and Node if needed; check repository completeness
 bash ./bootstrap.sh plan            # print exact paths, port, concurrency, and state location
-bash ./bootstrap.sh install         # install in place, build, check, and provision private state
+bash ./bootstrap.sh install         # install in place, build, and provision private state
 bash ./bootstrap.sh serve           # foreground production runtime for a detached/tmux agent job
 bash ./bootstrap.sh verify          # health, self-registration, archive, and confinement checks
 bash ./bootstrap.sh verify --live   # additionally execute one bounded real bashtv/free turn

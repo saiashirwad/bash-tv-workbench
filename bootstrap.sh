@@ -127,6 +127,11 @@ ensure_repository() {
   ok "local Git repository initialized (no remote configured)"
 }
 
+prepare_state() {
+  mkdir -p .state
+  chmod 700 .state
+}
+
 install() {
   doctor
   ensure_repository
@@ -134,10 +139,7 @@ install() {
   "$MISE" exec -- npm ci
   info "Building committed runtime assets"
   "$MISE" exec -- npm run build
-  info "Running Workbench and portability checks"
-  "$MISE" exec -- npm run check
-  mkdir -p .state
-  chmod 700 .state
+  prepare_state
   ok "Kyoot Workbench installed in place at $ROOT"
   chmod +x bootstrap.sh scripts/setup-space.sh
   info "Next: start 'bash ./bootstrap.sh serve' with the Bash.tv coding tool's detached/tmux mode."
@@ -145,8 +147,7 @@ install() {
 
 serve() {
   [[ -f typed-server.mjs ]] || fail "generated assets are missing; run ./bootstrap.sh install first"
-  mkdir -p .state
-  chmod 700 .state
+  prepare_state
   info "Starting Kyoot Workbench on $HOST:$PORT from the current session environment"
   info "This command intentionally remains in the foreground; launch it with the agent's detached/tmux tool mode."
   exec env \

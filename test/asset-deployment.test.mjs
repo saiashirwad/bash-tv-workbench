@@ -11,7 +11,7 @@ const manifest = JSON.parse(
 
 async function withServer(run) {
   const port = 18000 + Math.floor(Math.random() * 1000);
-  const child = spawn("/usr/bin/node", ["server.mjs"], {
+  const child = spawn(process.execPath, ["server.mjs"], {
     cwd: root,
     env: { ...process.env, HOST: "127.0.0.1", PORT: String(port) },
     stdio: ["ignore", "pipe", "pipe"],
@@ -26,8 +26,11 @@ async function withServer(run) {
     ]);
     await run(`http://127.0.0.1:${port}`);
   } finally {
-    child.kill("SIGTERM");
-    await once(child, "exit").catch(() => {});
+    if (child.exitCode === null && child.signalCode === null) {
+      const exited = once(child, "exit");
+      child.kill("SIGTERM");
+      await exited.catch(() => {});
+    }
     clearTimeout(timeout);
   }
 }

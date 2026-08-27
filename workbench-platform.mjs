@@ -325,10 +325,13 @@ export function makeWorkbenchPlatform({
       };
       options.signal?.addEventListener("abort", onAbort, { once: true });
       if (options.signal?.aborted) onAbort();
-      const timer = setTimeout(() => {
-        timedOut = true;
-        terminate();
-      }, Math.max(100, Math.min(300_000, timeoutMs)));
+      const timer = setTimeout(
+        () => {
+          timedOut = true;
+          terminate();
+        },
+        Math.max(100, Math.min(300_000, timeoutMs)),
+      );
       child.stdout.on("data", (chunk) => {
         if (stdout.length < MAX_CAPTURE) stdout += chunk;
       });
@@ -788,10 +791,10 @@ export function makeWorkbenchPlatform({
       const zipScript =
         "import sys,zipfile,os; target=sys.argv[1]; files=sys.stdin.buffer.read().decode().split('\\0'); z=zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED); [(z.write(f,f) if os.path.isfile(f) else None) for f in files if f]; z.close()";
       const result = await runRawInput(
-        format === "zip" ? "python3" : "tar",
+        format === "zip" ? "python3" : "env",
         format === "zip"
           ? ["-c", zipScript, target]
-          : ["-czf", target, "--null", "-T", "-"],
+          : ["COPYFILE_DISABLE=1", "tar", "-czf", target, "--null", "-T", "-"],
         selected.root,
         files.join("\0") + "\0",
         300_000,
@@ -889,8 +892,16 @@ export function makeWorkbenchPlatform({
           false,
         );
         const worktree = await runRawInput(
-          "tar",
-          ["-czf", worktreePath, "--null", "-T", "-"],
+          "env",
+          [
+            "COPYFILE_DISABLE=1",
+            "tar",
+            "-czf",
+            worktreePath,
+            "--null",
+            "-T",
+            "-",
+          ],
           projectRoot,
           files.length ? `${files.join("\0")}\0` : "",
           300_000,
@@ -970,8 +981,16 @@ export function makeWorkbenchPlatform({
           ...(bundleName ? [bundleName] : []),
         ];
         const packed = await runRaw(
-          "tar",
-          ["-czf", target, "-C", temporaryRoot, ...members],
+          "env",
+          [
+            "COPYFILE_DISABLE=1",
+            "tar",
+            "-czf",
+            target,
+            "-C",
+            temporaryRoot,
+            ...members,
+          ],
           projectRoot,
           300_000,
         );

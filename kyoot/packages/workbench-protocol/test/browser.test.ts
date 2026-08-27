@@ -256,9 +256,7 @@ test("browser store exposes collections and mutations without fetch calls", asyn
   };
   const server = authority({
     apply: async () => ({
-      changes: [
-        { collection: "runs", operation: "put", key: run.id, value: run },
-      ],
+      changes: [{ collection: "runs", operation: "put", key: run.id, value: run }],
     }),
   });
   const store = browserStore({

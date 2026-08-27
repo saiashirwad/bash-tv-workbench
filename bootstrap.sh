@@ -19,6 +19,10 @@ ok() { printf '[ok] %s\n' "$*"; }
 info() { printf '[info] %s\n' "$*"; }
 fail() { printf '[fail] %s\n' "$*" >&2; exit 1; }
 
+file_mode() {
+  stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"
+}
+
 verify_sha256() {
   local file="$1" expected="$2" actual
   if command -v sha256sum >/dev/null 2>&1; then
@@ -186,7 +190,7 @@ NODE
 
 verify_static() {
   "$MISE" exec -- npm run check:portable
-  [[ "$(stat -c '%a' .state)" == "700" ]] || fail ".state must have mode 0700"
+  [[ "$(file_mode .state)" == "700" ]] || fail ".state must have mode 0700"
   ok "state permissions"
   if find . -mindepth 2 -type d -name .git -print -quit | grep -q .; then
     fail "nested Git repository found"

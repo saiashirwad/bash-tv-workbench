@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { api, client, mutation, query, stream } from "@kyoot/rpc";
-export {
-  SyncRpc,
-  fromRpc as syncFromRpc,
-  handlers as syncHandlers,
-} from "@kyoot/sync/rpc";
+export { SyncRpc, fromRpc as syncFromRpc, handlers as syncHandlers } from "@kyoot/sync/rpc";
 
 export const RunStatus = z.enum([
   "queued",
@@ -206,11 +202,7 @@ const DomainError = z.object({
   _tag: z.string(),
   message: z.string(),
   operation: z.string().optional(),
-  issues: z
-    .array(
-      z.object({ path: z.string(), code: z.string(), message: z.string() }),
-    )
-    .optional(),
+  issues: z.array(z.object({ path: z.string(), code: z.string(), message: z.string() })).optional(),
 });
 
 /** On-demand operations. Replicated runs/projects use SyncRpc. */
@@ -534,16 +526,11 @@ export const SyncMutations = {
     readonly content: string;
     readonly expectedRevision?: string;
   }) => ({ type: "files/write", input }),
-  createWorkflow: (
-    input: z.input<typeof WorkbenchRpc.shape.workflows.create.input>,
-  ) => ({
+  createWorkflow: (input: z.input<typeof WorkbenchRpc.shape.workflows.create.input>) => ({
     type: "workflows/create",
     input,
   }),
-  addWorkflowTasks: (
-    workflowId: string,
-    tasks: z.input<typeof WorkflowTaskSpec>[],
-  ) => ({
+  addWorkflowTasks: (workflowId: string, tasks: z.input<typeof WorkflowTaskSpec>[]) => ({
     type: "workflows/add-tasks",
     input: { workflowId, tasks },
   }),

@@ -15775,9 +15775,7 @@ var DomainError = external_exports.object({
   _tag: external_exports.string(),
   message: external_exports.string(),
   operation: external_exports.string().optional(),
-  issues: external_exports.array(
-    external_exports.object({ path: external_exports.string(), code: external_exports.string(), message: external_exports.string() })
-  ).optional()
+  issues: external_exports.array(external_exports.object({ path: external_exports.string(), code: external_exports.string(), message: external_exports.string() })).optional()
 });
 var WorkbenchRpc = api("workbench", {
   runs: {

@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Project-scoped Bash.tv workbench",
   "private": true,
+  "bin": {
+    "bash-workbench": "bin/bash-workbench.mjs",
+    "bw": "bin/bash-workbench.mjs"
+  },
   "packageManager": "npm@11.17.0",
   "workspaces": [
     "kyoot",
@@ -17,12 +21,13 @@
     "build": "npm run build:editor && npm run build:markdown && npm run build:sync && npm run build:frontend && node scripts/generate-asset-manifest.mjs",
     "typecheck:frontend": "tsc -p tsconfig.frontend.json && tsc -p tsconfig.frontend-worker.json",
     "format": "prettier --write \"*.{js,mjs,ts,json}\" \"frontend/*.{ts,d.ts}\" \"public/index.html\" \"public/*.css\"",
-    "check:syntax": "node --check scripts/generate-asset-manifest.mjs && node --check server.mjs && node --check workbench-auth.mjs && node --check workbench-platform.mjs && node --check project-config.mjs && node --check child-provider.mjs && node --check public/app.js && node --check public/dom.js && node --check public/files.js && node --check public/git.js && node --check public/live-chat.js && node --check public/runs.js && node --check public/trajectory.js && node --check public/workflows.js && node --check public/webmcp.js && node --check public/sw.js",
+    "check:syntax": "node --check scripts/generate-asset-manifest.mjs && node --check server.mjs && node --check live-trajectory.mjs && node --check bin/bash-workbench.mjs && node --check workbench-auth.mjs && node --check workbench-platform.mjs && node --check project-config.mjs && node --check child-provider.mjs && node --check public/app.js && node --check public/dom.js && node --check public/files.js && node --check public/git.js && node --check public/live-chat.js && node --check public/runs.js && node --check public/trajectory.js && node --check public/workflows.js && node --check public/webmcp.js && node --check public/sw.js",
     "check:portable": "node scripts/check-standalone.mjs",
     "check:generated": "node scripts/check-generated.mjs",
     "check:typed-pages": "node scripts/check-typed-pages.mjs",
     "test:security": "node --test test/*.test.mjs",
     "verify:webmcp": "node scripts/verify-webmcp.mjs",
+    "cli": "node bin/bash-workbench.mjs",
     "check": "npm run typecheck:frontend && npm run check:syntax && npm run check:portable && npm run check:typed-pages && npm run test:security",
     "setup": "npm ci",
     "check:kyoot": "npm --prefix kyoot run format:check && npm --prefix kyoot run lint && node scripts/run-package-script.mjs typecheck && node scripts/run-package-script.mjs test",

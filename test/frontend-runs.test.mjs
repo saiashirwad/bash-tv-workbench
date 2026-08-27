@@ -17,11 +17,39 @@ function harness(initial = []) {
   const lists = [];
   const details = [];
   const drafts = [];
+  const appended = [];
+  const prepended = [];
   const alerts = [];
   let values = initial;
   const adapter = {
     all: () => values,
     refresh: async () => calls.push(["refresh"]),
+    get: async (id) => values.find((value) => value.id === id),
+    events: async (id, input = {}) => {
+      const events = values.find((value) => value.id === id)?.events || [];
+      const eligible =
+        input.before == null
+          ? events.filter(
+              (event, index) =>
+                (event.sequence || index + 1) > (input.after || 0),
+            )
+          : events.filter(
+              (event, index) => (event.sequence || index + 1) < input.before,
+            );
+      const page =
+        input.before == null
+          ? eligible.slice(0, input.limit || 100)
+          : eligible.slice(-(input.limit || 100));
+      return {
+        events: page,
+        nextCursor: page.at(-1)?.sequence || page.length,
+        previousCursor: page.at(0)?.sequence || (page.length ? 1 : null),
+        more: eligible.length > page.length,
+        moreBefore: input.before != null && eligible.length > page.length,
+        reset: false,
+        completed: true,
+      };
+    },
     stop: async (id) => calls.push(["stop", id]),
     compact: async (id) => calls.push(["compact", id]),
     message: async (id, prompt, attribution) =>
@@ -40,6 +68,8 @@ function harness(initial = []) {
     renderList: (runs, selected) =>
       lists.push({ ids: runs.map(({ id }) => id), selected }),
     renderDetail: (value, draft) => details.push({ value, draft }),
+    appendEvents: (events) => appended.push(events),
+    prependEvents: (events, more) => prepended.push({ events, more }),
     showListError: (error, hasRuns) =>
       calls.push(["error", error.message, hasRuns]),
     setDraft: (value) => drafts.push(value),
@@ -54,6 +84,8 @@ function harness(initial = []) {
     lists,
     details,
     drafts,
+    appended,
+    prepended,
     alerts,
     setValues: (next) => (values = next),
   };
@@ -87,17 +119,20 @@ test("run filtering is case-insensitive and always sorts newest first", () => {
   );
 });
 
-test("selection, filtering, and run event updates produce the expected views", () => {
+test("selection, filtering, and run event updates produce the expected views", async () => {
   const first = run("one");
   const h = harness([first, run("two")]);
   h.controller.update([first, run("two")]);
   h.controller.select("one");
+  await new Promise((resolve) => setTimeout(resolve, 0));
   h.controller.setFilter("two");
   const updated = run("one", {
     status: "running",
-    events: [{ type: "message", text: "new" }],
+    events: [{ id: "event-one", sequence: 1, type: "message", text: "new" }],
   });
+  h.setValues([updated, run("two")]);
   h.controller.update([updated, run("two")]);
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.deepEqual(h.lists.at(-1), { ids: ["two"], selected: "one" });
   assert.equal(h.details.at(-1).value.events[0].text, "new");
@@ -107,12 +142,14 @@ test("selection, filtering, and run event updates produce the expected views", (
   );
 });
 
-test("drafts are preserved per run across selection and event updates", () => {
+test("drafts are preserved per run across selection and event updates", async () => {
   const h = harness([run("one"), run("two")]);
   h.controller.update([run("one"), run("two")]);
   h.controller.select("one", { push: false });
+  await new Promise((resolve) => setTimeout(resolve, 0));
   h.controller.setDraft("one", "unfinished one");
   h.controller.select("two", { push: false });
+  await new Promise((resolve) => setTimeout(resolve, 0));
   h.controller.setDraft("two", "unfinished two");
   h.controller.update([
     run("one", { events: [{ type: "reasoning", text: "tick" }] }),

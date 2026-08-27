@@ -34,11 +34,20 @@ test("run events append to a versioned journal and paginate after restart", asyn
   const second = await engine.events(run.id, first.nextCursor, 10);
   assert.equal(second.events[0]!.sequence, 2);
   assert.equal(second.completed, true);
+  const tail = await engine.events(run.id, 0, 1, Number.MAX_SAFE_INTEGER);
+  assert.equal(tail.events[0]!.sequence, 2);
+  assert.equal(tail.previousCursor, 2);
+  assert.equal(tail.moreBefore, true);
+  const earlier = await engine.events(run.id, 0, 1, tail.previousCursor);
+  assert.equal(earlier.events[0]!.sequence, 1);
+  assert.equal(earlier.moreBefore, false);
   await engine.shutdown();
   const reopened = await directory(root);
   const restored = await reopened.get(run.id);
   assert.equal(restored?.events.length, 2);
-  const summary = JSON.parse(await fs.readFile(path.join(root, run.id, "run.json"), "utf8"));
+  const summary = JSON.parse(
+    await fs.readFile(path.join(root, run.id, "run.json"), "utf8"),
+  );
   assert.equal(summary.version, 3);
   assert.equal(summary.events, undefined);
 });
@@ -54,7 +63,11 @@ test("large tool payloads and final output persist as checksummed run artifacts"
     {
       turn: async (_run, _prompt, _continuing, context) => {
         await context.started();
-        await context.emit({ type: "tool", name: "read", result: largeToolResult });
+        await context.emit({
+          type: "tool",
+          name: "read",
+          result: largeToolResult,
+        });
         return { output: largeOutput };
       },
       compact: async () => ({}),
@@ -68,34 +81,57 @@ test("large tool payloads and final output persist as checksummed run artifacts"
   const run = await engine.get(created.id);
   assert.ok(run.output.length < RUN_INLINE_BYTES);
   assert.ok(run.outputArtifact);
-  assert.ok(run.artifactReferences?.some((item) => item.id === run.outputArtifact?.id));
+  assert.ok(
+    run.artifactReferences?.some((item) => item.id === run.outputArtifact?.id),
+  );
   const page = await engine.events(created.id);
   const event = page.events[0]!;
   assert.equal(event.result, undefined);
   assert.ok(event.payloadArtifact);
   assert.ok(Buffer.byteLength(JSON.stringify(event)) < RUN_INLINE_BYTES);
-  const eventReference = event.payloadArtifact as NonNullable<typeof run.outputArtifact>;
+  const eventReference = event.payloadArtifact as NonNullable<
+    typeof run.outputArtifact
+  >;
   const storedEvent = await store.readArtifact!(created.id, eventReference.id);
   assert.equal(storedEvent.metadata.contentType, "application/json");
   assert.equal(storedEvent.metadata.size, storedEvent.data.length);
-  assert.equal(crypto.createHash("sha256").update(storedEvent.data).digest("hex"), eventReference.sha256);
+  assert.equal(
+    crypto.createHash("sha256").update(storedEvent.data).digest("hex"),
+    eventReference.sha256,
+  );
   assert.equal(JSON.parse(storedEvent.data.toString()).result, largeToolResult);
-  const storedOutput = await store.readArtifact!(created.id, run.outputArtifact!.id);
+  const storedOutput = await store.readArtifact!(
+    created.id,
+    run.outputArtifact!.id,
+  );
   assert.equal(storedOutput.data.toString(), largeOutput);
-  assert.equal(crypto.createHash("sha256").update(storedOutput.data).digest("hex"), run.outputArtifact!.sha256);
+  assert.equal(
+    crypto.createHash("sha256").update(storedOutput.data).digest("hex"),
+    run.outputArtifact!.sha256,
+  );
 
   await engine.shutdown();
   const reopened = await directory(root);
   const restored = await reopened.get(created.id);
   assert.equal(restored?.outputArtifact?.sha256, run.outputArtifact!.sha256);
-  assert.equal((await reopened.readArtifact!(created.id, run.outputArtifact!.id)).data.toString(), largeOutput);
-  const journal = await fs.readFile(path.join(root, created.id, "events.jsonl"), "utf8");
+  assert.equal(
+    (
+      await reopened.readArtifact!(created.id, run.outputArtifact!.id)
+    ).data.toString(),
+    largeOutput,
+  );
+  const journal = await fs.readFile(
+    path.join(root, created.id, "events.jsonl"),
+    "utf8",
+  );
   assert.ok(Buffer.byteLength(journal) < RUN_INLINE_BYTES);
   assert.doesNotMatch(journal, /tool-result:/);
 });
 
 test("run artifact retention removes expired and excess artifacts", async (t) => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "run-artifact-retention-"));
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), "run-artifact-retention-"),
+  );
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const store = await directory(root, { maxArtifactsPerRun: 1, maxAgeMs: 20 });
   const engine = await makeRunEngine(
@@ -103,8 +139,14 @@ test("run artifact retention removes expired and excess artifacts", async (t) =>
     {
       turn: async (_run, _prompt, _continuing, context) => {
         await context.started();
-        await context.emit({ type: "tool", result: "a".repeat(RUN_INLINE_BYTES + 1) });
-        await context.emit({ type: "tool", result: "b".repeat(RUN_INLINE_BYTES + 1) });
+        await context.emit({
+          type: "tool",
+          result: "a".repeat(RUN_INLINE_BYTES + 1),
+        });
+        await context.emit({
+          type: "tool",
+          result: "b".repeat(RUN_INLINE_BYTES + 1),
+        });
         return {};
       },
       compact: async () => ({}),
@@ -114,12 +156,23 @@ test("run artifact retention removes expired and excess artifacts", async (t) =>
   const run = await engine.create({ prompt: "retention", cwd: root });
   while ((await engine.get(run.id)).status !== "completed")
     await new Promise((resolve) => setTimeout(resolve, 5));
-  const refs = (await engine.events(run.id)).events.map((event) => event.payloadArtifact as { id: string });
-  await assert.rejects(() => store.readArtifact!(run.id, refs[0]!.id), /not found/);
-  assert.ok((await store.readArtifact!(run.id, refs[1]!.id)).data.length > RUN_INLINE_BYTES);
+  const refs = (await engine.events(run.id)).events.map(
+    (event) => event.payloadArtifact as { id: string },
+  );
+  await assert.rejects(
+    () => store.readArtifact!(run.id, refs[0]!.id),
+    /not found/,
+  );
+  assert.ok(
+    (await store.readArtifact!(run.id, refs[1]!.id)).data.length >
+      RUN_INLINE_BYTES,
+  );
   await new Promise((resolve) => setTimeout(resolve, 25));
   assert.equal(await store.cleanupArtifacts!(run.id), 1);
-  await assert.rejects(() => store.readArtifact!(run.id, refs[1]!.id), /not found/);
+  await assert.rejects(
+    () => store.readArtifact!(run.id, refs[1]!.id),
+    /not found/,
+  );
   await engine.shutdown();
 });
 
@@ -145,7 +198,14 @@ test("version 1 and 2 run.json events migrate without loss", async (t) => {
         pid: null,
         exitCode: 0,
         error: null,
-        events: [{ id: `e${version}`, at: new Date().toISOString(), type: "text", text: `legacy-v${version}` }],
+        events: [
+          {
+            id: `e${version}`,
+            at: new Date().toISOString(),
+            type: "text",
+            text: `legacy-v${version}`,
+          },
+        ],
         output: "",
         turnCount: 1,
         creator: null,
@@ -158,6 +218,9 @@ test("version 1 and 2 run.json events migrate without loss", async (t) => {
     const id = `old-v${version}`;
     const restored = await store.get(id);
     assert.equal(restored?.events[0]?.sequence, 1);
-    assert.match(await fs.readFile(path.join(root, id, "events.jsonl"), "utf8"), new RegExp(`legacy-v${version}`));
+    assert.match(
+      await fs.readFile(path.join(root, id, "events.jsonl"), "utf8"),
+      new RegExp(`legacy-v${version}`),
+    );
   }
 });

@@ -150,6 +150,29 @@
   padding: 0 28px 58px;
   background: #1d1d1f;
 }
+
+.loadearlier,
+.agentloading {
+  align-self: center;
+  margin: 6px auto 14px;
+  color: var(--muted, #8b8b94);
+  font:
+    600 11px/1.4 ui-monospace,
+    monospace;
+  letter-spacing: 0.04em;
+}
+
+button.loadearlier {
+  padding: 7px 12px;
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+button.loadearlier:hover {
+  color: var(--text, #f2f2f4);
+}
 .event {
   max-width: none;
   padding: 14px 0;

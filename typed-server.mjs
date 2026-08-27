@@ -15628,6 +15628,34 @@ var Run = external_exports.object({
   creator: external_exports.unknown().nullable().optional(),
   originChat: external_exports.unknown().nullable().optional()
 }).catchall(external_exports.unknown());
+var RunSummary = external_exports.object({
+  id: external_exports.string(),
+  project: external_exports.string(),
+  title: external_exports.string(),
+  promptPreview: external_exports.string(),
+  status: RunStatus,
+  createdAt: external_exports.string(),
+  updatedAt: external_exports.string(),
+  startedAt: external_exports.string().nullable().optional(),
+  endedAt: external_exports.string().nullable().optional(),
+  toolCount: external_exports.number().int().nonnegative(),
+  turnCount: external_exports.number().int().positive(),
+  eventCursor: external_exports.number().int().nonnegative(),
+  creator: external_exports.unknown().nullable().optional(),
+  originChat: external_exports.unknown().nullable().optional()
+});
+var TrajectoryEventSummary = external_exports.object({
+  id: external_exports.string(),
+  sequence: external_exports.number().int().positive(),
+  type: external_exports.string(),
+  turn: external_exports.number().int().nonnegative(),
+  at: external_exports.string().nullable(),
+  label: external_exports.string(),
+  summary: external_exports.string(),
+  toolName: external_exports.string().optional(),
+  durationMs: external_exports.number().nonnegative().nullable().optional(),
+  isError: external_exports.boolean().optional()
+});
 var Project = external_exports.object({
   id: external_exports.string(),
   name: external_exports.string(),
@@ -15747,10 +15775,17 @@ var DomainError = external_exports.object({
   _tag: external_exports.string(),
   message: external_exports.string(),
   operation: external_exports.string().optional(),
-  issues: external_exports.array(external_exports.object({ path: external_exports.string(), code: external_exports.string(), message: external_exports.string() })).optional()
+  issues: external_exports.array(
+    external_exports.object({ path: external_exports.string(), code: external_exports.string(), message: external_exports.string() })
+  ).optional()
 });
 var WorkbenchRpc = api("workbench", {
   runs: {
+    list: query({
+      input: Empty,
+      output: external_exports.array(RunSummary),
+      error: DomainError
+    }),
     get: query({ input: RunId, output: Run, error: DomainError }),
     create: mutation({
       input: external_exports.object({
@@ -15780,12 +15815,15 @@ var WorkbenchRpc = api("workbench", {
       input: external_exports.object({
         id: external_exports.string(),
         after: external_exports.number().int().nonnegative().default(0),
+        before: external_exports.number().int().positive().nullable().default(null),
         limit: external_exports.number().int().positive().max(1e3).default(100)
       }),
       output: external_exports.object({
         events: external_exports.array(external_exports.unknown()),
         nextCursor: external_exports.number().int().nonnegative(),
+        previousCursor: external_exports.number().int().positive().nullable(),
         more: external_exports.boolean(),
+        moreBefore: external_exports.boolean(),
         reset: external_exports.boolean(),
         completed: external_exports.boolean()
       }),
@@ -15810,6 +15848,33 @@ var WorkbenchRpc = api("workbench", {
         limit: external_exports.number().int().positive().max(250).default(100)
       }),
       output: LiveMessagePage,
+      error: DomainError
+    }),
+    trajectory: query({
+      input: external_exports.object({
+        before: external_exports.number().int().positive().nullable().default(null),
+        limit: external_exports.number().int().positive().max(250).default(100),
+        query: external_exports.string().max(500).default("")
+      }),
+      output: external_exports.object({
+        events: external_exports.array(TrajectoryEventSummary),
+        previousCursor: external_exports.number().int().positive().nullable(),
+        moreBefore: external_exports.boolean(),
+        total: external_exports.number().int().nonnegative(),
+        overview: external_exports.object({
+          turns: external_exports.number().int().nonnegative(),
+          tools: external_exports.number().int().nonnegative(),
+          users: external_exports.number().int().nonnegative(),
+          start: external_exports.string().nullable(),
+          end: external_exports.string().nullable(),
+          durationMs: external_exports.number().nonnegative()
+        })
+      }),
+      error: DomainError
+    }),
+    trajectoryEvent: query({
+      input: external_exports.object({ id: external_exports.string() }),
+      output: external_exports.unknown(),
       error: DomainError
     })
   },
@@ -16011,6 +16076,22 @@ var putRun = (run4) => ({
   key: run4.id,
   value: run4
 });
+var summarizeRun = (run4) => ({
+  id: run4.id,
+  project: run4.project,
+  title: run4.title || run4.prompt?.split("\n")[0] || "Agent",
+  promptPreview: String(run4.prompt || "").replace(/\s+/g, " ").slice(0, 240),
+  status: run4.status,
+  createdAt: run4.createdAt,
+  updatedAt: run4.updatedAt,
+  startedAt: run4.startedAt ?? null,
+  endedAt: run4.endedAt ?? null,
+  toolCount: run4.toolCount ?? 0,
+  turnCount: run4.turnCount ?? 1,
+  eventCursor: Number(run4.events?.at(-1)?.sequence) || Number(run4.eventCursor || 0),
+  creator: run4.creator ?? null,
+  originChat: run4.originChat ?? null
+});
 var putWorkflow = (workflow) => ({
   collection: "workflows",
   operation: "put",
@@ -16036,8 +16117,9 @@ var makeTypedApi = async (backend, workflowBackend2) => {
   ]);
   let runState = new Map(runs.map((run4) => [run4.id, JSON.stringify(run4)]));
   const mutationResult = (run4) => {
-    runState.set(run4.id, JSON.stringify(run4));
-    return { changes: [putRun(run4)], result: run4 };
+    const summary = summarizeRun(run4);
+    runState.set(run4.id, JSON.stringify(summary));
+    return { changes: [putRun(summary)], result: run4 };
   };
   const sync = authority({
     initial: { runs, projects, workflows },
@@ -16147,6 +16229,14 @@ var makeTypedApi = async (backend, workflowBackend2) => {
     if (changes3.length) sync.commit(changes3);
     return changes3.length;
   };
+  const refreshRun = async (id2) => {
+    const summary = summarizeRun(await backend.getRun(id2));
+    const serialized = JSON.stringify(summary);
+    if (runState.get(id2) === serialized) return false;
+    runState.set(id2, serialized);
+    sync.commit([putRun(summary)]);
+    return true;
+  };
   if (workflowBackend2)
     workflowBackend2.subscribe((event) => {
       if (!event.type.startsWith("workflow.") && !event.type.startsWith("task."))
@@ -16165,36 +16255,43 @@ var makeTypedApi = async (backend, workflowBackend2) => {
   };
   const workbench = router(WorkbenchRpc, {
     runs: {
+      list: () => promise2(async () => [...await backend.listRuns()]),
       get: ({ id: id2 }) => promise2(() => backend.getRun(id2)),
       create: (input) => promise2(async () => {
         const run4 = await backend.createRun(input);
-        runState.set(run4.id, JSON.stringify(run4));
-        sync.commit([putRun(run4)]);
+        const summary = summarizeRun(run4);
+        runState.set(run4.id, JSON.stringify(summary));
+        sync.commit([putRun(summary)]);
         return run4;
       }),
       message: (input) => promise2(async () => {
         const run4 = await backend.messageRun(input);
-        runState.set(run4.id, JSON.stringify(run4));
-        sync.commit([putRun(run4)]);
+        const summary = summarizeRun(run4);
+        runState.set(run4.id, JSON.stringify(summary));
+        sync.commit([putRun(summary)]);
         return run4;
       }),
       compact: ({ id: id2 }) => promise2(async () => {
         const run4 = await backend.compactRun(id2);
-        runState.set(run4.id, JSON.stringify(run4));
-        sync.commit([putRun(run4)]);
+        const summary = summarizeRun(run4);
+        runState.set(run4.id, JSON.stringify(summary));
+        sync.commit([putRun(summary)]);
         return run4;
       }),
       stop: ({ id: id2 }) => promise2(async () => {
         const run4 = await backend.stopRun(id2);
-        runState.set(run4.id, JSON.stringify(run4));
-        sync.commit([putRun(run4)]);
+        const summary = summarizeRun(run4);
+        runState.set(run4.id, JSON.stringify(summary));
+        sync.commit([putRun(summary)]);
         return run4;
       }),
-      events: ({ id: id2, after, limit }) => promise2(
-        async () => backend.runEvents ? backend.runEvents(id2, after, limit) : {
+      events: ({ id: id2, after, before, limit }) => promise2(
+        async () => backend.runEvents ? backend.runEvents(id2, after, limit, before) : {
           events: (await backend.getRun(id2)).events ?? [],
           nextCursor: 0,
+          previousCursor: null,
           more: false,
+          moreBefore: false,
           reset: false,
           completed: true
         }
@@ -16209,6 +16306,16 @@ var makeTypedApi = async (backend, workflowBackend2) => {
         if (!backend.liveSessionPage)
           throw new Error("Live session paging is unavailable");
         return backend.liveSessionPage(input);
+      }),
+      trajectory: (input) => promise2(() => {
+        if (!backend.liveTrajectory)
+          throw new Error("Live trajectory paging is unavailable");
+        return backend.liveTrajectory(input);
+      }),
+      trajectoryEvent: ({ id: id2 }) => promise2(() => {
+        if (!backend.liveTrajectoryEvent)
+          throw new Error("Live trajectory details are unavailable");
+        return backend.liveTrajectoryEvent(id2);
       })
     },
     files: {
@@ -16346,6 +16453,7 @@ var makeTypedApi = async (backend, workflowBackend2) => {
   });
   return {
     sync,
+    refreshRun,
     refreshRuns,
     workbench,
     syncApp: httpApp(router(SyncRpc, handlers(sync))),
@@ -17347,7 +17455,13 @@ var makePiWorkflowEngine = (store, options) => makeEngine(store, piExecutor(opti
 
 // orchestrator-kyoot/src/run-engine.ts
 import crypto3 from "node:crypto";
-var activeStatus = /* @__PURE__ */ new Set(["queued", "starting", "running", "compacting", "stopping"]);
+var activeStatus = /* @__PURE__ */ new Set([
+  "queued",
+  "starting",
+  "running",
+  "compacting",
+  "stopping"
+]);
 var errorText2 = (error52) => error52 instanceof Error ? error52.message : String(error52);
 var makeRunEngine = async (store, executor, options) => {
   const maxConcurrency = Math.max(1, options.maxConcurrency ?? 3);
@@ -17439,7 +17553,11 @@ var makeRunEngine = async (store, executor, options) => {
         });
       };
       const prompt2 = run4.pendingPrompt ?? run4.prompt;
-      const result = run4.operation === "compact" ? await executor.compact(run4, { signal: controller.signal, emit, started }) : await executor.turn(run4, prompt2, run4.turnCount > 1, {
+      const result = run4.operation === "compact" ? await executor.compact(run4, {
+        signal: controller.signal,
+        emit,
+        started
+      }) : await executor.turn(run4, prompt2, run4.turnCount > 1, {
         signal: controller.signal,
         emit,
         started
@@ -17499,7 +17617,9 @@ var makeRunEngine = async (store, executor, options) => {
   const enqueueExisting = async (id2, patch) => locked(id2, async () => {
     const current = await requireRun(id2);
     if (activeStatus.has(current.status))
-      throw Object.assign(new Error("Run already has an active operation"), { status: 409 });
+      throw Object.assign(new Error("Run already has an active operation"), {
+        status: 409
+      });
     const next = await publish({
       ...current,
       ...patch,
@@ -17512,15 +17632,21 @@ var makeRunEngine = async (store, executor, options) => {
     return next;
   });
   const engine = {
-    list: async () => [...await store.list()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    list: async () => [...await store.list()].sort(
+      (a, b) => b.createdAt.localeCompare(a.createdAt)
+    ),
     get: requireRun,
     create: async (input) => {
       const prompt2 = input.prompt.trim();
       if (!prompt2 || prompt2.length > 2e4)
-        throw Object.assign(new Error("Prompt must be 1\u201320,000 characters"), { status: 400 });
+        throw Object.assign(new Error("Prompt must be 1\u201320,000 characters"), {
+          status: 400
+        });
       const id2 = input.id ?? options.id?.() ?? crypto3.randomUUID();
       if (await store.get(id2))
-        throw Object.assign(new Error("Run id already exists"), { status: 409 });
+        throw Object.assign(new Error("Run id already exists"), {
+          status: 409
+        });
       const createdAt = now();
       const run4 = {
         version: 1,
@@ -17555,7 +17681,9 @@ var makeRunEngine = async (store, executor, options) => {
     message: async (id2, prompt2, attribution = {}) => {
       const message = prompt2.trim();
       if (!message || message.length > 2e4)
-        throw Object.assign(new Error("Prompt must be 1\u201320,000 characters"), { status: 400 });
+        throw Object.assign(new Error("Prompt must be 1\u201320,000 characters"), {
+          status: 400
+        });
       const current = await requireRun(id2);
       const event = {
         id: crypto3.randomUUID(),
@@ -17583,17 +17711,36 @@ var makeRunEngine = async (store, executor, options) => {
       const current = await requireRun(id2);
       if (!activeStatus.has(current.status)) return current;
       if (current.status === "queued")
-        return publish({ ...current, status: "stopped", endedAt: now(), pendingPrompt: null });
+        return publish({
+          ...current,
+          status: "stopped",
+          endedAt: now(),
+          pendingPrompt: null
+        });
       const next = await publish({ ...current, status: "stopping" });
       controllers.get(id2)?.abort();
       return next;
     }),
-    events: async (id2, after = 0, limit = 100) => {
+    events: async (id2, after = 0, limit = 100, before = null) => {
       const run4 = await requireRun(id2);
-      const page = store.readEvents ? await store.readEvents(id2, after, Math.max(1, Math.min(1e3, limit))) : {
-        events: run4.events.filter((event) => (event.sequence ?? 0) > after).slice(0, limit),
+      const page = store.readEventPage ? await store.readEventPage(id2, {
+        after,
+        before,
+        limit: Math.max(1, Math.min(1e3, limit))
+      }) : store.readEvents && before == null ? {
+        ...await store.readEvents(
+          id2,
+          after,
+          Math.max(1, Math.min(1e3, limit))
+        ),
+        previousCursor: null,
+        moreBefore: false
+      } : {
+        events: before == null ? run4.events.filter((event) => (event.sequence ?? 0) > after).slice(0, limit) : run4.events.filter((event) => (event.sequence ?? 0) < before).slice(-limit),
         nextCursor: run4.events.at(-1)?.sequence ?? after,
-        more: false,
+        previousCursor: run4.events.at(0)?.sequence ?? null,
+        more: before == null && run4.events.length > limit,
+        moreBefore: before != null && run4.events.length > limit,
         reset: false
       };
       return { ...page, completed: !activeStatus.has(run4.status) };
@@ -17606,7 +17753,8 @@ var makeRunEngine = async (store, executor, options) => {
       stopped = true;
       if (wake) clearTimeout(wake);
       for (const controller of controllers.values()) controller.abort();
-      while (active > 0) await new Promise((resolve) => setTimeout(resolve, 20));
+      while (active > 0)
+        await new Promise((resolve) => setTimeout(resolve, 20));
       await store.flush();
     }
   };
@@ -17778,7 +17926,9 @@ var RUN_OUTPUT_PREVIEW_BYTES = 2 * 1024;
 var atomicWrite2 = async (filename, value2) => {
   const temporary = `${filename}.${process.pid}.${crypto5.randomUUID()}.tmp`;
   await fs4.mkdir(path4.dirname(filename), { recursive: true, mode: 448 });
-  await fs4.writeFile(temporary, JSON.stringify(value2, null, 2), { mode: 384 });
+  await fs4.writeFile(temporary, JSON.stringify(value2, null, 2), {
+    mode: 384
+  });
   await fs4.rename(temporary, filename);
   await fs4.chmod(filename, 384);
 };
@@ -17792,16 +17942,54 @@ var compactEvent = (event, reference) => {
   };
   for (const key of ["name", "callId", "isError"])
     if (key in event && bytes(event[key]) <= 1024) compact2[key] = event[key];
-  return { ...compact2, payloadArtifact: reference, artifactReferences: [reference] };
+  return {
+    ...compact2,
+    payloadArtifact: reference,
+    artifactReferences: [reference]
+  };
 };
 var references = (run4, additions) => {
-  const merged = new Map((run4.artifactReferences ?? []).map((item) => [item.id, item]));
+  const merged = new Map(
+    (run4.artifactReferences ?? []).map((item) => [item.id, item])
+  );
   for (const item of additions) merged.set(item.id, item);
   return [...merged.values()].slice(-256);
+};
+var eventPage = (all2, {
+  after = 0,
+  before = null,
+  limit
+}) => {
+  const bounded = Math.max(1, Math.min(1e3, limit));
+  if (before != null) {
+    const eligible2 = all2.filter((event) => (event.sequence ?? 0) < before);
+    const events2 = eligible2.slice(-bounded);
+    const first = events2.at(0)?.sequence ?? null;
+    return {
+      events: events2,
+      nextCursor: events2.at(-1)?.sequence ?? Math.max(0, before - 1),
+      previousCursor: first,
+      more: false,
+      moreBefore: first != null && eligible2.some((event) => (event.sequence ?? 0) < first),
+      reset: false
+    };
+  }
+  const eligible = all2.filter((event) => (event.sequence ?? 0) > after);
+  const events = eligible.slice(0, bounded);
+  const earliest = all2.at(0)?.sequence ?? after + 1;
+  return {
+    events,
+    nextCursor: events.at(-1)?.sequence ?? after,
+    previousCursor: events.at(0)?.sequence ?? null,
+    more: eligible.length > events.length,
+    moreBefore: false,
+    reset: after > 0 && after < earliest - 1
+  };
 };
 var directory2 = async (root, retention = {}) => {
   await fs4.mkdir(root, { recursive: true, mode: 448 });
   const runs = /* @__PURE__ */ new Map();
+  const journals = /* @__PURE__ */ new Map();
   const writes = /* @__PURE__ */ new Map();
   const limits = {
     count: Math.max(1, retention.maxArtifactsPerRun ?? 128),
@@ -17821,15 +18009,20 @@ var directory2 = async (root, retention = {}) => {
     for (const entry of await fs4.readdir(artifactDir(runId)).catch(() => [])) {
       if (!entry.endsWith(".json")) continue;
       try {
-        const value2 = JSON.parse(await fs4.readFile(path4.join(artifactDir(runId), entry), "utf8"));
-        if (value2.runId === runId && value2.id === entry.slice(0, -5)) result.push(value2);
+        const value2 = JSON.parse(
+          await fs4.readFile(path4.join(artifactDir(runId), entry), "utf8")
+        );
+        if (value2.runId === runId && value2.id === entry.slice(0, -5))
+          result.push(value2);
       } catch {
       }
     }
     return result;
   };
   const cleanupOne = async (runId) => {
-    const all2 = (await artifactMetadata(runId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const all2 = (await artifactMetadata(runId)).sort(
+      (a, b) => b.createdAt.localeCompare(a.createdAt)
+    );
     let keptBytes = 0, kept = 0, removed = 0;
     for (const item of all2) {
       const expired = Date.parse(item.expiresAt) <= Date.now();
@@ -17872,15 +18065,22 @@ var directory2 = async (root, retention = {}) => {
   for (const entry of await fs4.readdir(root).catch(() => [])) {
     try {
       const filename = path4.join(root, entry, "run.json");
-      const parsed = JSON.parse(await fs4.readFile(filename, "utf8"));
-      if (!parsed.id || !parsed.cwd || !parsed.prompt || !parsed.createdAt) continue;
+      const parsed = JSON.parse(
+        await fs4.readFile(filename, "utf8")
+      );
+      if (!parsed.id || !parsed.cwd || !parsed.prompt || !parsed.createdAt)
+        continue;
       const eventFile = path4.join(root, entry, "events.jsonl");
       let events = parsed.events ?? [];
       try {
         events = (await fs4.readFile(eventFile, "utf8")).split("\n").filter(Boolean).map((line) => JSON.parse(line));
       } catch {
       }
-      events = events.map((event, index) => ({ ...event, sequence: event.sequence ?? index + 1 }));
+      events = events.map((event, index) => ({
+        ...event,
+        sequence: event.sequence ?? index + 1
+      }));
+      journals.set(parsed.id, [...structuredClone(events)]);
       const normalized = {
         version: parsed.version === 3 ? 3 : parsed.version === 2 ? 2 : 1,
         id: parsed.id,
@@ -17912,9 +18112,17 @@ var directory2 = async (root, retention = {}) => {
       const restored = recover2(normalized);
       runs.set(restored.id, restored);
       if (parsed.events?.length && !await fs4.stat(eventFile).catch(() => null))
-        await fs4.writeFile(eventFile, events.map((event) => JSON.stringify(event)).join("\n") + "\n", { mode: 384 });
+        await fs4.writeFile(
+          eventFile,
+          events.map((event) => JSON.stringify(event)).join("\n") + "\n",
+          { mode: 384 }
+        );
       if (JSON.stringify(restored) !== JSON.stringify(parsed))
-        await atomicWrite2(filename, { ...restored, version: 3, events: void 0 });
+        await atomicWrite2(filename, {
+          ...restored,
+          version: 3,
+          events: void 0
+        });
       await cleanupOne(parsed.id);
     } catch {
     }
@@ -17922,8 +18130,18 @@ var directory2 = async (root, retention = {}) => {
   const put = async (input) => {
     let run4 = structuredClone(input);
     if (Buffer.byteLength(run4.output) > RUN_INLINE_BYTES) {
-      const ref = await saveArtifact(run4.id, "final-output", "text/plain; charset=utf-8", Buffer.from(run4.output));
-      run4 = { ...run4, output: Buffer.from(run4.output).subarray(-RUN_OUTPUT_PREVIEW_BYTES).toString(), outputArtifact: ref, artifactReferences: references(run4, [ref]) };
+      const ref = await saveArtifact(
+        run4.id,
+        "final-output",
+        "text/plain; charset=utf-8",
+        Buffer.from(run4.output)
+      );
+      run4 = {
+        ...run4,
+        output: Buffer.from(run4.output).subarray(-RUN_OUTPUT_PREVIEW_BYTES).toString(),
+        outputArtifact: ref,
+        artifactReferences: references(run4, [ref])
+      };
     }
     runs.set(run4.id, structuredClone(run4));
     const filename = path4.join(root, run4.id, "run.json");
@@ -17945,45 +18163,78 @@ var directory2 = async (root, retention = {}) => {
     appendEvent: async (runId, input) => {
       let event = structuredClone(input);
       if (bytes(event) > RUN_INLINE_BYTES) {
-        const ref = await saveArtifact(runId, "event-payload", "application/json", Buffer.from(JSON.stringify(event)));
+        const ref = await saveArtifact(
+          runId,
+          "event-payload",
+          "application/json",
+          Buffer.from(JSON.stringify(event))
+        );
         event = compactEvent(event, ref);
       }
       const filename = path4.join(root, runId, "events.jsonl");
       await fs4.mkdir(path4.dirname(filename), { recursive: true, mode: 448 });
       const key = `${runId}:events`, previous = writes.get(key) ?? Promise.resolve();
-      const next = previous.then(() => fs4.appendFile(filename, JSON.stringify(event) + "\n", { mode: 384 }));
+      const next = previous.then(
+        () => fs4.appendFile(filename, JSON.stringify(event) + "\n", { mode: 384 })
+      );
       writes.set(key, next);
       try {
         await next;
       } finally {
         if (writes.get(key) === next) writes.delete(key);
       }
+      const journal = journals.get(runId) ?? [];
+      journal.push(structuredClone(event));
+      journals.set(runId, journal);
       return event;
     },
     readEvents: async (runId, after, limit) => {
-      const all2 = runs.get(runId)?.events ?? [], earliest = all2[0]?.sequence ?? after + 1;
-      const events = all2.filter((event) => (event.sequence ?? 0) > after), page = events.slice(0, limit);
-      return { events: page, nextCursor: page.at(-1)?.sequence ?? after, more: events.length > limit, reset: after > 0 && after < earliest - 1 };
+      const page = eventPage(journals.get(runId) ?? [], { after, limit });
+      return {
+        events: page.events,
+        nextCursor: page.nextCursor,
+        more: page.more,
+        reset: page.reset
+      };
     },
+    readEventPage: async (runId, input) => eventPage(journals.get(runId) ?? [], input),
     readArtifact: async (runId, id2) => {
-      if (!/^[0-9a-f-]{36}$/.test(id2)) throw Object.assign(new Error("Run artifact not found"), { status: 404 });
+      if (!/^[0-9a-f-]{36}$/.test(id2))
+        throw Object.assign(new Error("Run artifact not found"), {
+          status: 404
+        });
       try {
-        const metadata = JSON.parse(await fs4.readFile(path4.join(artifactDir(runId), `${id2}.json`), "utf8"));
+        const metadata = JSON.parse(
+          await fs4.readFile(
+            path4.join(artifactDir(runId), `${id2}.json`),
+            "utf8"
+          )
+        );
         if (metadata.runId !== runId || Date.parse(metadata.expiresAt) <= Date.now()) {
           await removeArtifact(runId, id2);
-          throw Object.assign(new Error("Run artifact not found"), { status: 404 });
+          throw Object.assign(new Error("Run artifact not found"), {
+            status: 404
+          });
         }
-        const data = await fs4.readFile(path4.join(artifactDir(runId), `${id2}.data`));
+        const data = await fs4.readFile(
+          path4.join(artifactDir(runId), `${id2}.data`)
+        );
         const checksum = crypto5.createHash("sha256").update(data).digest("hex");
-        if (data.length !== metadata.size || checksum !== metadata.sha256) throw new Error("Run artifact checksum mismatch");
+        if (data.length !== metadata.size || checksum !== metadata.sha256)
+          throw new Error("Run artifact checksum mismatch");
         return { metadata, data };
       } catch (error52) {
         if (error52.code === "ENOENT")
-          throw Object.assign(new Error("Run artifact not found"), { status: 404 });
+          throw Object.assign(new Error("Run artifact not found"), {
+            status: 404
+          });
         throw error52;
       }
     },
-    cleanupArtifacts: async (runId) => runId ? cleanupOne(runId) : (await Promise.all([...runs.keys()].map(cleanupOne))).reduce((a, b) => a + b, 0),
+    cleanupArtifacts: async (runId) => runId ? cleanupOne(runId) : (await Promise.all([...runs.keys()].map(cleanupOne))).reduce(
+      (a, b) => a + b,
+      0
+    ),
     flush: async () => void await Promise.all(writes.values())
   };
 };
@@ -18014,10 +18265,34 @@ var publicRun = (raw, projects) => {
   );
   return {
     ...raw,
+    eventCursor: raw.events?.at(-1)?.sequence ?? 0,
+    events: void 0,
     project: project?.id ?? "",
     title: raw.title || raw.prompt?.split("\n")[0] || "Agent",
     createdAt: raw.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
     updatedAt: raw.endedAt || raw.startedAt || raw.createdAt || (/* @__PURE__ */ new Date()).toISOString()
+  };
+};
+var publicRunSummary = (raw, projects) => {
+  const project = [...projects.values()].find(
+    (candidate) => candidate.root === raw.cwd
+  );
+  const prompt2 = String(raw.prompt || "");
+  return {
+    id: raw.id,
+    project: project?.id ?? raw.project ?? "",
+    title: raw.title || prompt2.split("\n")[0] || "Agent",
+    promptPreview: prompt2.replace(/\s+/g, " ").slice(0, 240),
+    status: raw.status,
+    createdAt: raw.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
+    updatedAt: raw.updatedAt || raw.endedAt || raw.startedAt || raw.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
+    startedAt: raw.startedAt ?? null,
+    endedAt: raw.endedAt ?? null,
+    toolCount: raw.toolCount ?? 0,
+    turnCount: raw.turnCount ?? 1,
+    eventCursor: raw.events?.at(-1)?.sequence ?? 0,
+    creator: raw.creator ?? null,
+    originChat: raw.originChat ?? null
   };
 };
 var requireProject = (projects, id2) => {
@@ -18027,7 +18302,7 @@ var requireProject = (projects, id2) => {
   return project;
 };
 var kyootBackend = (services, runs, invokePlatform) => ({
-  listRuns: async () => (await runs.list()).map((run4) => publicRun(run4, services.projects)),
+  listRuns: async () => (await runs.list()).map((run4) => publicRunSummary(run4, services.projects)),
   listProjects: async () => [...services.projects.values()].map(({ id: id2, name, root }) => ({
     id: id2,
     name,
@@ -18036,6 +18311,8 @@ var kyootBackend = (services, runs, invokePlatform) => ({
   })),
   liveSession: (input) => services.liveSession(input),
   liveSessionPage: (input) => services.liveSessionPage(input),
+  liveTrajectory: (input) => services.liveTrajectory(input),
+  liveTrajectoryEvent: (id2) => services.liveTrajectoryEvent(id2),
   async getRun(id2) {
     return publicRun(await runs.get(id2), services.projects);
   },
@@ -18061,8 +18338,8 @@ var kyootBackend = (services, runs, invokePlatform) => ({
   async stopRun(id2) {
     return publicRun(await runs.stop(id2), services.projects);
   },
-  async runEvents(id2, after, limit) {
-    return runs.events(id2, after, limit);
+  async runEvents(id2, after, limit, before) {
+    return runs.events(id2, after, limit, before);
   },
   async fileTree(project, path5) {
     return (await services.tree(requireProject(services.projects, project).root, path5)).entries;

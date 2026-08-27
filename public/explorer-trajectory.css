@@ -404,6 +404,11 @@
   text-align: left;
   cursor: pointer;
 }
+
+.trajectoryload {
+  display: block;
+  margin: 10px auto;
+}
 .trajectoryevent:hover,
 .trajectoryevent.selected {
   background: #222225;

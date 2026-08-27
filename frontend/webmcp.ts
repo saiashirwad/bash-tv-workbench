@@ -207,9 +207,14 @@ export async function registerWorkbenchWebMcp(
         ["id"],
       ),
       annotations: readOnly,
-      execute: ({ id, includeEvents = true }) => {
-        const run = requireRun(store, id);
-        return includeEvents ? run : { ...run, events: undefined };
+      execute: async ({ id, includeEvents = true }, { signal } = {}) => {
+        requireRun(store, id);
+        const run = await abortable(signal, () => store.getRun(id).load());
+        if (!includeEvents) return run;
+        const page = await abortable(signal, () =>
+          store.runEventPage(id, { after: 0, limit: 500 }),
+        );
+        return { ...run, events: page.events, eventsTruncated: page.more };
       },
     },
     {

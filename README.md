@@ -66,6 +66,24 @@ bash ./bootstrap.sh archive         # create a standalone ZIP from Git HEAD
 
 The browser UI exposes typed Workbench queries and mutations as browser-native WebMCP tools when `document.modelContext` is available. See [`WEBMCP.md`](WEBMCP.md) for the tool inventory and desktop coding-harness setup.
 
+## Agent CLI
+
+`bootstrap.sh install` adds `bash-workbench` and the short `bw` alias to
+`$HOME/.local/bin`. The CLI gives a Bash.tv coding agent direct control of
+runs, workflows, files, Git, managed processes, artifacts, snapshots, VM
+inspection, Live Trajectory, and every validated platform operation.
+
+```bash
+bw status
+bw projects list
+bw runs create --project bash-workbench --prompt "Fix the failing build"
+bw runs watch RUN_ID
+bw exec --project bash-workbench -- npm test
+bw op list
+```
+
+See [`CLI.md`](CLI.md) for the complete command interface.
+
 ## Development commands
 
 ```bash

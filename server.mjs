@@ -6,6 +6,7 @@ import os from "node:os";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { createGzip } from "node:zlib";
+import { Readable } from "node:stream";
 import crypto from "node:crypto";
 import { loadProjects } from "./project-config.mjs";
 import { makeWorkbenchPlatform } from "./workbench-platform.mjs";
@@ -19,6 +20,7 @@ import {
   liveCursor,
   paginateLiveMessages,
 } from "./live-session-reader.mjs";
+import { LiveTrajectoryIndex } from "./live-trajectory.mjs";
 import {
   kyootBackend,
   makePiWorkflowEngine,
@@ -45,10 +47,16 @@ const ASSET_MANIFEST_FILE = path.join(PUBLIC, "asset-manifest.json");
 let assetManifest;
 try {
   assetManifest = JSON.parse(await fsp.readFile(ASSET_MANIFEST_FILE, "utf8"));
-  if (assetManifest?.version !== 1 || !assetManifest.assets || typeof assetManifest.assets !== "object")
+  if (
+    assetManifest?.version !== 1 ||
+    !assetManifest.assets ||
+    typeof assetManifest.assets !== "object"
+  )
     throw new Error("unsupported format");
 } catch (error) {
-  throw new Error(`Generated asset manifest is missing or invalid: ${error.message}`);
+  throw new Error(
+    `Generated asset manifest is missing or invalid: ${error.message}`,
+  );
 }
 const hashedAssets = new Set(Object.values(assetManifest.assets));
 const WORKFLOW_CONTROL_FILE = path.join(
@@ -246,6 +254,7 @@ async function writeProjectFile(root, relative, body) {
   };
 }
 const liveSessionReader = new LiveSessionReader(SESSION_ROOT);
+const liveTrajectoryIndex = new LiveTrajectoryIndex();
 function messageImages(text) {
   const images = [],
     seen = new Set(),
@@ -266,96 +275,6 @@ function textOf(content) {
     .filter((x) => x && (x.type === "text" || typeof x.text === "string"))
     .map((x) => x.text || "")
     .join("\n");
-}
-function trajectoryText(content, type) {
-  return (Array.isArray(content) ? content : [])
-    .filter((x) => x?.type === type)
-    .map((x) => x.text || x.thinking || "")
-    .filter(Boolean)
-    .join("\n");
-}
-function trajectoryData(rows) {
-  const events = [];
-  let turn = 0;
-  const callTimes = new Map();
-  for (const row of rows) {
-    const m = row.type === "message" ? row.message : null;
-    if (!m) continue;
-    const at = row.timestamp || m.timestamp || null;
-    if (m.role === "user") {
-      turn++;
-      events.push({
-        id: row.id,
-        type: "user",
-        turn,
-        at,
-        label: "User",
-        text: textOf(m.content).slice(0, 30000),
-      });
-    } else if (m.role === "assistant") {
-      const thinking = trajectoryText(m.content, "thinking"),
-        text = trajectoryText(m.content, "text");
-      if (thinking)
-        events.push({
-          id: row.id + "-thinking",
-          type: "reasoning",
-          turn,
-          at,
-          label: "Thinking",
-          text: thinking.slice(0, 30000),
-          usage: m.usage || null,
-        });
-      if (text)
-        events.push({
-          id: row.id + "-text",
-          type: "assistant",
-          turn,
-          at,
-          label: "Assistant",
-          text: text.slice(0, 30000),
-          usage: m.usage || null,
-        });
-      for (const c of Array.isArray(m.content) ? m.content : [])
-        if (c?.type === "toolCall") {
-          callTimes.set(c.id, at);
-          events.push({
-            id: c.id || row.id + "-tool",
-            type: "tool",
-            turn,
-            at,
-            label: c.name || "Tool",
-            toolName: c.name,
-            args: c.arguments || c.args || null,
-          });
-        }
-    } else if (m.role === "toolResult") {
-      const started = callTimes.get(m.toolCallId),
-        durationMs =
-          started && at ? Math.max(0, new Date(at) - new Date(started)) : null;
-      events.push({
-        id: row.id,
-        type: m.isError ? "error" : "result",
-        turn,
-        at,
-        label: m.toolName || "Result",
-        toolName: m.toolName,
-        callId: m.toolCallId,
-        text: textOf(m.content).slice(0, 30000),
-        details: m.details || null,
-        isError: !!m.isError,
-        durationMs,
-      });
-    }
-  }
-  const start = events.find((x) => x.at)?.at,
-    end = [...events].reverse().find((x) => x.at)?.at;
-  return {
-    events,
-    turns: turn,
-    start,
-    end,
-    durationMs: start && end ? Math.max(0, new Date(end) - new Date(start)) : 0,
-  };
 }
 function liveMessage(row, sequence) {
   const m = row.type === "message" ? row.message : null;
@@ -397,6 +316,7 @@ async function sessionData(includeMessages = false, includeTrajectory = false) {
   const current = await liveSessionReader.refresh();
   if (!current.stat) return null;
   const rows = current.rows;
+  liveTrajectoryIndex.update(current.identity, rows);
   const latest = { m: current.stat.mtimeMs, size: current.stat.size };
   const header = rows.find((x) => x.type === "session") || {};
   const modelChange =
@@ -463,8 +383,20 @@ async function sessionData(includeMessages = false, includeTrajectory = false) {
           cursor: liveCursor(current.identity, messages.length),
         }
       : {}),
-    ...(includeTrajectory ? { trajectory: trajectoryData(rows) } : {}),
+    ...(includeTrajectory
+      ? { trajectory: liveTrajectoryIndex.page({ limit: 100 }) }
+      : {}),
   };
+}
+async function liveTrajectoryPage(input) {
+  const current = await liveSessionReader.refresh();
+  liveTrajectoryIndex.update(current.identity, current.rows);
+  return liveTrajectoryIndex.page(input);
+}
+async function liveTrajectoryEvent(id) {
+  const current = await liveSessionReader.refresh();
+  liveTrajectoryIndex.update(current.identity, current.rows);
+  return liveTrajectoryIndex.event(id);
 }
 async function liveSessionPage(cursor, limit) {
   const current = await liveSessionReader.refresh();
@@ -755,10 +687,11 @@ const typedApi = await makeTypedApi(
       liveSession: ({ messages, trajectory }) =>
         sessionData(messages, trajectory),
       liveSessionPage: ({ cursor, limit }) => liveSessionPage(cursor, limit),
+      liveTrajectory: (input) => liveTrajectoryPage(input),
+      liveTrajectoryEvent,
       tree,
       searchFiles,
-      contentSearch: (input, options) =>
-        platform.contentSearch(input, options),
+      contentSearch: (input, options) => platform.contentSearch(input, options),
       gitInfo,
       readFile: (project, relative) => readProjectFile(project.root, relative),
       writeFile: (project, relative, body) =>
@@ -791,8 +724,8 @@ const typedApi = await makeTypedApi(
   ),
   workflowBackend(workflowEngine, (id) => PROJECTS.has(id)),
 );
-const unsubscribeRuns = runEngine.subscribe(() => {
-  typedApi.refreshRuns().catch(() => {});
+const unsubscribeRuns = runEngine.subscribe((run) => {
+  typedApi.refreshRun(run.id).catch(() => {});
 });
 const refreshTypedRuns = setInterval(() => {
   typedApi.refreshRuns().catch(() => {});
@@ -819,12 +752,27 @@ async function serveWebApp(req, res, app, capability) {
   );
   const response = await app(request);
   const headers = Object.fromEntries(response.headers);
+  const gzip =
+    /(?:^|,)\s*gzip\s*(?:,|$)/i.test(
+      String(req.headers["accept-encoding"] || ""),
+    ) && String(headers["content-type"] || "").includes("json");
+  if (gzip) {
+    delete headers["content-length"];
+    headers["content-encoding"] = "gzip";
+    headers.vary = headers.vary
+      ? `${headers.vary}, Accept-Encoding`
+      : "Accept-Encoding";
+  }
   res.writeHead(response.status, {
     ...headers,
     ...securityHeaders(),
     "cache-control": "private, no-store",
   });
   if (!response.body) return res.end();
+  if (gzip) {
+    Readable.fromWeb(response.body).pipe(createGzip()).pipe(res);
+    return;
+  }
   const reader = response.body.getReader();
   try {
     while (!res.writableEnded) {
@@ -971,12 +919,15 @@ const server = http.createServer(async (req, res) => {
     }
     if (u.pathname.startsWith("/api/"))
       return fail(res, 404, "API route not found");
-    if (req.method !== "GET" && req.method !== "HEAD") return fail(res, 405, "Method not allowed");
+    if (req.method !== "GET" && req.method !== "HEAD")
+      return fail(res, 405, "Method not allowed");
     const logicalAsset = assetManifest.assets[u.pathname];
-    let file = u.pathname === "/" ? "index.html" : (logicalAsset || u.pathname).slice(1);
-    file = u.pathname === "/workbench-operation-catalog.mjs"
-      ? path.join(applicationRoot, "workbench-operation-catalog.mjs")
-      : safePath(PUBLIC, file);
+    let file =
+      u.pathname === "/" ? "index.html" : (logicalAsset || u.pathname).slice(1);
+    file =
+      u.pathname === "/workbench-operation-catalog.mjs"
+        ? path.join(applicationRoot, "workbench-operation-catalog.mjs")
+        : safePath(PUBLIC, file);
     const st = await fsp.stat(file).catch(() => null);
     if (!st?.isFile()) {
       file = path.join(PUBLIC, "index.html");

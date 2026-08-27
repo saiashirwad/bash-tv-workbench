@@ -25,13 +25,35 @@ export interface RunStore {
   get(id: string): Promise<Run | undefined>;
   put(run: Run): Promise<Run>;
   appendEvent?(runId: string, event: RunEvent): Promise<RunEvent>;
-  readEvents?(runId: string, after: number, limit: number): Promise<{
+  readEvents?(
+    runId: string,
+    after: number,
+    limit: number,
+  ): Promise<{
     events: readonly RunEvent[];
     nextCursor: number;
     more: boolean;
     reset: boolean;
   }>;
-  readArtifact?(runId: string, id: string): Promise<{ metadata: StoredRunArtifact; data: Buffer }>;
+  readEventPage?(
+    runId: string,
+    input: {
+      readonly after?: number;
+      readonly before?: number | null;
+      readonly limit: number;
+    },
+  ): Promise<{
+    events: readonly RunEvent[];
+    nextCursor: number;
+    previousCursor: number | null;
+    more: boolean;
+    moreBefore: boolean;
+    reset: boolean;
+  }>;
+  readArtifact?(
+    runId: string,
+    id: string,
+  ): Promise<{ metadata: StoredRunArtifact; data: Buffer }>;
   cleanupArtifacts?(runId?: string): Promise<number>;
   flush(): Promise<void>;
 }
@@ -39,12 +61,18 @@ export interface RunStore {
 const atomicWrite = async (filename: string, value: unknown) => {
   const temporary = `${filename}.${process.pid}.${crypto.randomUUID()}.tmp`;
   await fs.mkdir(path.dirname(filename), { recursive: true, mode: 0o700 });
-  await fs.writeFile(temporary, JSON.stringify(value, null, 2), { mode: 0o600 });
+  await fs.writeFile(temporary, JSON.stringify(value, null, 2), {
+    mode: 0o600,
+  });
   await fs.rename(temporary, filename);
   await fs.chmod(filename, 0o600);
 };
-const bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value) ?? "null");
-const compactEvent = (event: RunEvent, reference: RunArtifactReference): RunEvent => {
+const bytes = (value: unknown) =>
+  Buffer.byteLength(JSON.stringify(value) ?? "null");
+const compactEvent = (
+  event: RunEvent,
+  reference: RunArtifactReference,
+): RunEvent => {
   const compact: Record<string, unknown> = {
     id: event.id,
     sequence: event.sequence,
@@ -53,25 +81,83 @@ const compactEvent = (event: RunEvent, reference: RunArtifactReference): RunEven
   };
   for (const key of ["name", "callId", "isError"])
     if (key in event && bytes(event[key]) <= 1024) compact[key] = event[key];
-  return { ...compact, payloadArtifact: reference, artifactReferences: [reference] } as unknown as RunEvent;
+  return {
+    ...compact,
+    payloadArtifact: reference,
+    artifactReferences: [reference],
+  } as unknown as RunEvent;
 };
 const references = (run: Run, additions: readonly RunArtifactReference[]) => {
-  const merged = new Map((run.artifactReferences ?? []).map((item) => [item.id, item]));
+  const merged = new Map(
+    (run.artifactReferences ?? []).map((item) => [item.id, item]),
+  );
   for (const item of additions) merged.set(item.id, item);
   return [...merged.values()].slice(-256);
+};
+const eventPage = (
+  all: readonly RunEvent[],
+  {
+    after = 0,
+    before = null,
+    limit,
+  }: { after?: number; before?: number | null; limit: number },
+) => {
+  const bounded = Math.max(1, Math.min(1000, limit));
+  if (before != null) {
+    const eligible = all.filter((event) => (event.sequence ?? 0) < before);
+    const events = eligible.slice(-bounded);
+    const first = events.at(0)?.sequence ?? null;
+    return {
+      events,
+      nextCursor: events.at(-1)?.sequence ?? Math.max(0, before - 1),
+      previousCursor: first,
+      more: false,
+      moreBefore:
+        first != null &&
+        eligible.some((event) => (event.sequence ?? 0) < first),
+      reset: false,
+    };
+  }
+  const eligible = all.filter((event) => (event.sequence ?? 0) > after);
+  const events = eligible.slice(0, bounded);
+  const earliest = all.at(0)?.sequence ?? after + 1;
+  return {
+    events,
+    nextCursor: events.at(-1)?.sequence ?? after,
+    previousCursor: events.at(0)?.sequence ?? null,
+    more: eligible.length > events.length,
+    moreBefore: false,
+    reset: after > 0 && after < earliest - 1,
+  };
 };
 
 export const memory = (initial: readonly Run[] = []): RunStore => {
   const runs = new Map(initial.map((run) => [run.id, structuredClone(run)]));
-  const artifacts = new Map<string, { metadata: StoredRunArtifact; data: Buffer }>();
-  const save = (runId: string, kind: StoredRunArtifact["kind"], contentType: string, input: Buffer) => {
+  const journals = new Map(
+    initial.map((run) => [run.id, [...structuredClone(run.events)]]),
+  );
+  const artifacts = new Map<
+    string,
+    { metadata: StoredRunArtifact; data: Buffer }
+  >();
+  const save = (
+    runId: string,
+    kind: StoredRunArtifact["kind"],
+    contentType: string,
+    input: Buffer,
+  ) => {
     const id = crypto.randomUUID();
     const data = Buffer.from(input);
     const createdAt = new Date().toISOString();
     const metadata: StoredRunArtifact = {
-      id, runId, kind, contentType, size: data.length,
+      id,
+      runId,
+      kind,
+      contentType,
+      size: data.length,
       sha256: crypto.createHash("sha256").update(data).digest("hex"),
-      createdAt, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     };
     artifacts.set(`${runId}:${id}`, { metadata, data });
     return metadata;
@@ -82,8 +168,20 @@ export const memory = (initial: readonly Run[] = []): RunStore => {
     put: async (input) => {
       let run = structuredClone(input);
       if (Buffer.byteLength(run.output) > RUN_INLINE_BYTES) {
-        const ref = save(run.id, "final-output", "text/plain; charset=utf-8", Buffer.from(run.output));
-        run = { ...run, output: Buffer.from(run.output).subarray(-RUN_OUTPUT_PREVIEW_BYTES).toString(), outputArtifact: ref, artifactReferences: references(run, [ref]) };
+        const ref = save(
+          run.id,
+          "final-output",
+          "text/plain; charset=utf-8",
+          Buffer.from(run.output),
+        );
+        run = {
+          ...run,
+          output: Buffer.from(run.output)
+            .subarray(-RUN_OUTPUT_PREVIEW_BYTES)
+            .toString(),
+          outputArtifact: ref,
+          artifactReferences: references(run, [ref]),
+        };
       }
       runs.set(run.id, run);
       return structuredClone(run);
@@ -91,19 +189,36 @@ export const memory = (initial: readonly Run[] = []): RunStore => {
     appendEvent: async (runId, input) => {
       let event = structuredClone(input);
       if (bytes(event) > RUN_INLINE_BYTES) {
-        const ref = save(runId, "event-payload", "application/json", Buffer.from(JSON.stringify(event)));
+        const ref = save(
+          runId,
+          "event-payload",
+          "application/json",
+          Buffer.from(JSON.stringify(event)),
+        );
         event = compactEvent(event, ref);
       }
+      const journal = journals.get(runId) ?? [];
+      journal.push(structuredClone(event));
+      journals.set(runId, journal);
       return event;
     },
     readEvents: async (runId, after, limit) => {
-      const events = (runs.get(runId)?.events ?? []).filter((event) => (event.sequence ?? 0) > after);
-      const page = events.slice(0, limit);
-      return { events: page, nextCursor: page.at(-1)?.sequence ?? after, more: events.length > limit, reset: false };
+      const page = eventPage(journals.get(runId) ?? [], { after, limit });
+      return {
+        events: page.events,
+        nextCursor: page.nextCursor,
+        more: page.more,
+        reset: page.reset,
+      };
     },
+    readEventPage: async (runId, input) =>
+      eventPage(journals.get(runId) ?? [], input),
     readArtifact: async (runId, id) => {
       const value = artifacts.get(`${runId}:${id}`);
-      if (!value) throw Object.assign(new Error("Run artifact not found"), { status: 404 });
+      if (!value)
+        throw Object.assign(new Error("Run artifact not found"), {
+          status: 404,
+        });
       return { metadata: value.metadata, data: Buffer.from(value.data) };
     },
     cleanupArtifacts: async () => 0,
@@ -111,9 +226,13 @@ export const memory = (initial: readonly Run[] = []): RunStore => {
   };
 };
 
-export const directory = async (root: string, retention: RunArtifactRetention = {}): Promise<RunStore> => {
+export const directory = async (
+  root: string,
+  retention: RunArtifactRetention = {},
+): Promise<RunStore> => {
   await fs.mkdir(root, { recursive: true, mode: 0o700 });
   const runs = new Map<string, Run>();
+  const journals = new Map<string, RunEvent[]>();
   const writes = new Map<string, Promise<void>>();
   const limits = {
     count: Math.max(1, retention.maxArtifactsPerRun ?? 128),
@@ -133,33 +252,59 @@ export const directory = async (root: string, retention: RunArtifactRetention = 
     for (const entry of await fs.readdir(artifactDir(runId)).catch(() => [])) {
       if (!entry.endsWith(".json")) continue;
       try {
-        const value = JSON.parse(await fs.readFile(path.join(artifactDir(runId), entry), "utf8")) as StoredRunArtifact;
-        if (value.runId === runId && value.id === entry.slice(0, -5)) result.push(value);
+        const value = JSON.parse(
+          await fs.readFile(path.join(artifactDir(runId), entry), "utf8"),
+        ) as StoredRunArtifact;
+        if (value.runId === runId && value.id === entry.slice(0, -5))
+          result.push(value);
       } catch {}
     }
     return result;
   };
   const cleanupOne = async (runId: string) => {
-    const all = (await artifactMetadata(runId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    let keptBytes = 0, kept = 0, removed = 0;
+    const all = (await artifactMetadata(runId)).sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    );
+    let keptBytes = 0,
+      kept = 0,
+      removed = 0;
     for (const item of all) {
       const expired = Date.parse(item.expiresAt) <= Date.now();
-      if (expired || kept >= limits.count || keptBytes + item.size > limits.total) {
-        await removeArtifact(runId, item.id); removed++;
-      } else { kept++; keptBytes += item.size; }
+      if (
+        expired ||
+        kept >= limits.count ||
+        keptBytes + item.size > limits.total
+      ) {
+        await removeArtifact(runId, item.id);
+        removed++;
+      } else {
+        kept++;
+        keptBytes += item.size;
+      }
     }
     return removed;
   };
-  const saveArtifact = async (runId: string, kind: StoredRunArtifact["kind"], contentType: string, input: Buffer) => {
+  const saveArtifact = async (
+    runId: string,
+    kind: StoredRunArtifact["kind"],
+    contentType: string,
+    input: Buffer,
+  ) => {
     const originalSize = input.length;
     const data = input.subarray(0, Math.min(limits.artifact, limits.total));
     const id = crypto.randomUUID();
     const createdAt = new Date().toISOString();
     const metadata: StoredRunArtifact = {
-      id, runId, kind, contentType, size: data.length, originalSize,
+      id,
+      runId,
+      kind,
+      contentType,
+      size: data.length,
+      originalSize,
       truncated: data.length !== originalSize,
       sha256: crypto.createHash("sha256").update(data).digest("hex"),
-      createdAt, expiresAt: new Date(Date.now() + limits.age).toISOString(),
+      createdAt,
+      expiresAt: new Date(Date.now() + limits.age).toISOString(),
     };
     const dir = artifactDir(runId);
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
@@ -174,30 +319,73 @@ export const directory = async (root: string, retention: RunArtifactRetention = 
   for (const entry of await fs.readdir(root).catch(() => [])) {
     try {
       const filename = path.join(root, entry, "run.json");
-      const parsed = JSON.parse(await fs.readFile(filename, "utf8")) as Partial<Run>;
-      if (!parsed.id || !parsed.cwd || !parsed.prompt || !parsed.createdAt) continue;
+      const parsed = JSON.parse(
+        await fs.readFile(filename, "utf8"),
+      ) as Partial<Run>;
+      if (!parsed.id || !parsed.cwd || !parsed.prompt || !parsed.createdAt)
+        continue;
       const eventFile = path.join(root, entry, "events.jsonl");
       let events = parsed.events ?? [];
-      try { events = (await fs.readFile(eventFile, "utf8")).split("\n").filter(Boolean).map((line) => JSON.parse(line)); } catch {}
-      events = events.map((event, index) => ({ ...event, sequence: event.sequence ?? index + 1 }));
+      try {
+        events = (await fs.readFile(eventFile, "utf8"))
+          .split("\n")
+          .filter(Boolean)
+          .map((line) => JSON.parse(line));
+      } catch {}
+      events = events.map((event, index) => ({
+        ...event,
+        sequence: event.sequence ?? index + 1,
+      }));
+      journals.set(parsed.id, [...structuredClone(events)]);
       const normalized: Run = {
         version: parsed.version === 3 ? 3 : parsed.version === 2 ? 2 : 1,
-        id: parsed.id, title: parsed.title || parsed.prompt.split("\n")[0] || "Agent", prompt: parsed.prompt,
-        cwd: parsed.cwd, sessionDir: parsed.sessionDir || path.join(root, parsed.id, "session"),
-        createdAt: parsed.createdAt, updatedAt: parsed.updatedAt || parsed.endedAt || parsed.startedAt || parsed.createdAt,
-        startedAt: parsed.startedAt ?? null, endedAt: parsed.endedAt ?? null, status: parsed.status ?? "interrupted",
-        pid: parsed.pid ?? null, exitCode: parsed.exitCode ?? null, error: parsed.error ?? null, events,
-        output: parsed.output ?? "", outputArtifact: parsed.outputArtifact, artifactReferences: parsed.artifactReferences ?? [],
-        turnCount: parsed.turnCount ?? 1, creator: parsed.creator ?? null, originChat: parsed.originChat ?? null,
-        usage: parsed.usage ?? null, changes: parsed.changes ?? [], toolCount: parsed.toolCount ?? 0,
-        operation: parsed.operation ?? "turn", pendingPrompt: parsed.pendingPrompt ?? null,
+        id: parsed.id,
+        title: parsed.title || parsed.prompt.split("\n")[0] || "Agent",
+        prompt: parsed.prompt,
+        cwd: parsed.cwd,
+        sessionDir: parsed.sessionDir || path.join(root, parsed.id, "session"),
+        createdAt: parsed.createdAt,
+        updatedAt:
+          parsed.updatedAt ||
+          parsed.endedAt ||
+          parsed.startedAt ||
+          parsed.createdAt,
+        startedAt: parsed.startedAt ?? null,
+        endedAt: parsed.endedAt ?? null,
+        status: parsed.status ?? "interrupted",
+        pid: parsed.pid ?? null,
+        exitCode: parsed.exitCode ?? null,
+        error: parsed.error ?? null,
+        events,
+        output: parsed.output ?? "",
+        outputArtifact: parsed.outputArtifact,
+        artifactReferences: parsed.artifactReferences ?? [],
+        turnCount: parsed.turnCount ?? 1,
+        creator: parsed.creator ?? null,
+        originChat: parsed.originChat ?? null,
+        usage: parsed.usage ?? null,
+        changes: parsed.changes ?? [],
+        toolCount: parsed.toolCount ?? 0,
+        operation: parsed.operation ?? "turn",
+        pendingPrompt: parsed.pendingPrompt ?? null,
       };
       const restored = recover(normalized);
       runs.set(restored.id, restored);
-      if (parsed.events?.length && !(await fs.stat(eventFile).catch(() => null)))
-        await fs.writeFile(eventFile, events.map((event) => JSON.stringify(event)).join("\n") + "\n", { mode: 0o600 });
+      if (
+        parsed.events?.length &&
+        !(await fs.stat(eventFile).catch(() => null))
+      )
+        await fs.writeFile(
+          eventFile,
+          events.map((event) => JSON.stringify(event)).join("\n") + "\n",
+          { mode: 0o600 },
+        );
       if (JSON.stringify(restored) !== JSON.stringify(parsed))
-        await atomicWrite(filename, { ...restored, version: 3, events: undefined });
+        await atomicWrite(filename, {
+          ...restored,
+          version: 3,
+          events: undefined,
+        });
       await cleanupOne(parsed.id);
     } catch {}
   }
@@ -205,8 +393,20 @@ export const directory = async (root: string, retention: RunArtifactRetention = 
   const put = async (input: Run) => {
     let run = structuredClone(input);
     if (Buffer.byteLength(run.output) > RUN_INLINE_BYTES) {
-      const ref = await saveArtifact(run.id, "final-output", "text/plain; charset=utf-8", Buffer.from(run.output));
-      run = { ...run, output: Buffer.from(run.output).subarray(-RUN_OUTPUT_PREVIEW_BYTES).toString(), outputArtifact: ref, artifactReferences: references(run, [ref]) };
+      const ref = await saveArtifact(
+        run.id,
+        "final-output",
+        "text/plain; charset=utf-8",
+        Buffer.from(run.output),
+      );
+      run = {
+        ...run,
+        output: Buffer.from(run.output)
+          .subarray(-RUN_OUTPUT_PREVIEW_BYTES)
+          .toString(),
+        outputArtifact: ref,
+        artifactReferences: references(run, [ref]),
+      };
     }
     runs.set(run.id, structuredClone(run));
     const filename = path.join(root, run.id, "run.json");
@@ -214,7 +414,11 @@ export const directory = async (root: string, retention: RunArtifactRetention = 
     const summary = { ...run, version: 3, events: undefined };
     const next = previous.then(() => atomicWrite(filename, summary));
     writes.set(run.id, next);
-    try { await next; } finally { if (writes.get(run.id) === next) writes.delete(run.id); }
+    try {
+      await next;
+    } finally {
+      if (writes.get(run.id) === next) writes.delete(run.id);
+    }
     return structuredClone(run);
   };
 
@@ -225,40 +429,86 @@ export const directory = async (root: string, retention: RunArtifactRetention = 
     appendEvent: async (runId, input) => {
       let event = structuredClone(input);
       if (bytes(event) > RUN_INLINE_BYTES) {
-        const ref = await saveArtifact(runId, "event-payload", "application/json", Buffer.from(JSON.stringify(event)));
+        const ref = await saveArtifact(
+          runId,
+          "event-payload",
+          "application/json",
+          Buffer.from(JSON.stringify(event)),
+        );
         event = compactEvent(event, ref);
       }
       const filename = path.join(root, runId, "events.jsonl");
       await fs.mkdir(path.dirname(filename), { recursive: true, mode: 0o700 });
-      const key = `${runId}:events`, previous = writes.get(key) ?? Promise.resolve();
-      const next = previous.then(() => fs.appendFile(filename, JSON.stringify(event) + "\n", { mode: 0o600 }));
+      const key = `${runId}:events`,
+        previous = writes.get(key) ?? Promise.resolve();
+      const next = previous.then(() =>
+        fs.appendFile(filename, JSON.stringify(event) + "\n", { mode: 0o600 }),
+      );
       writes.set(key, next);
-      try { await next; } finally { if (writes.get(key) === next) writes.delete(key); }
+      try {
+        await next;
+      } finally {
+        if (writes.get(key) === next) writes.delete(key);
+      }
+      const journal = journals.get(runId) ?? [];
+      journal.push(structuredClone(event));
+      journals.set(runId, journal);
       return event;
     },
     readEvents: async (runId, after, limit) => {
-      const all = runs.get(runId)?.events ?? [], earliest = all[0]?.sequence ?? after + 1;
-      const events = all.filter((event) => (event.sequence ?? 0) > after), page = events.slice(0, limit);
-      return { events: page, nextCursor: page.at(-1)?.sequence ?? after, more: events.length > limit, reset: after > 0 && after < earliest - 1 };
+      const page = eventPage(journals.get(runId) ?? [], { after, limit });
+      return {
+        events: page.events,
+        nextCursor: page.nextCursor,
+        more: page.more,
+        reset: page.reset,
+      };
     },
+    readEventPage: async (runId, input) =>
+      eventPage(journals.get(runId) ?? [], input),
     readArtifact: async (runId, id) => {
-      if (!/^[0-9a-f-]{36}$/.test(id)) throw Object.assign(new Error("Run artifact not found"), { status: 404 });
+      if (!/^[0-9a-f-]{36}$/.test(id))
+        throw Object.assign(new Error("Run artifact not found"), {
+          status: 404,
+        });
       try {
-        const metadata = JSON.parse(await fs.readFile(path.join(artifactDir(runId), `${id}.json`), "utf8")) as StoredRunArtifact;
-        if (metadata.runId !== runId || Date.parse(metadata.expiresAt) <= Date.now()) {
-          await removeArtifact(runId, id); throw Object.assign(new Error("Run artifact not found"), { status: 404 });
+        const metadata = JSON.parse(
+          await fs.readFile(
+            path.join(artifactDir(runId), `${id}.json`),
+            "utf8",
+          ),
+        ) as StoredRunArtifact;
+        if (
+          metadata.runId !== runId ||
+          Date.parse(metadata.expiresAt) <= Date.now()
+        ) {
+          await removeArtifact(runId, id);
+          throw Object.assign(new Error("Run artifact not found"), {
+            status: 404,
+          });
         }
-        const data = await fs.readFile(path.join(artifactDir(runId), `${id}.data`));
+        const data = await fs.readFile(
+          path.join(artifactDir(runId), `${id}.data`),
+        );
         const checksum = crypto.createHash("sha256").update(data).digest("hex");
-        if (data.length !== metadata.size || checksum !== metadata.sha256) throw new Error("Run artifact checksum mismatch");
+        if (data.length !== metadata.size || checksum !== metadata.sha256)
+          throw new Error("Run artifact checksum mismatch");
         return { metadata, data };
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === "ENOENT")
-          throw Object.assign(new Error("Run artifact not found"), { status: 404 });
+          throw Object.assign(new Error("Run artifact not found"), {
+            status: 404,
+          });
         throw error;
       }
     },
-    cleanupArtifacts: async (runId) => runId ? cleanupOne(runId) : (await Promise.all([...runs.keys()].map(cleanupOne))).reduce((a, b) => a + b, 0),
+    cleanupArtifacts: async (runId) =>
+      runId
+        ? cleanupOne(runId)
+        : (await Promise.all([...runs.keys()].map(cleanupOne))).reduce(
+            (a, b) => a + b,
+            0,
+          ),
     flush: async () => void (await Promise.all(writes.values())),
   };
 };

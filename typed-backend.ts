@@ -3,6 +3,7 @@ import type {
   GitCommit,
   Project,
   Run,
+  RunSummary,
 } from "@kyoot/workbench-protocol";
 import type { WorkbenchBackend } from "./orchestrator-kyoot/src/typed-api.ts";
 export { makeTypedApi } from "./orchestrator-kyoot/src/typed-api.ts";
@@ -54,6 +55,12 @@ export interface WorkbenchServices {
     readonly cursor?: string | null;
     readonly limit?: number;
   }): Promise<any>;
+  liveTrajectory(input: {
+    readonly before?: number | null;
+    readonly limit?: number;
+    readonly query?: string;
+  }): Promise<any>;
+  liveTrajectoryEvent(id: string): Promise<any>;
   tree(
     root: string,
     relative?: string,
@@ -84,12 +91,44 @@ const publicRun = (
   );
   return {
     ...raw,
+    eventCursor: raw.events?.at(-1)?.sequence ?? 0,
+    events: undefined,
     project: project?.id ?? "",
     title: raw.title || raw.prompt?.split("\n")[0] || "Agent",
     createdAt: raw.createdAt || new Date().toISOString(),
     updatedAt:
       raw.endedAt || raw.startedAt || raw.createdAt || new Date().toISOString(),
   } as Run;
+};
+const publicRunSummary = (
+  raw: any,
+  projects: ReadonlyMap<string, WorkbenchProject>,
+): RunSummary => {
+  const project = [...projects.values()].find(
+    (candidate) => candidate.root === raw.cwd,
+  );
+  const prompt = String(raw.prompt || "");
+  return {
+    id: raw.id,
+    project: project?.id ?? raw.project ?? "",
+    title: raw.title || prompt.split("\n")[0] || "Agent",
+    promptPreview: prompt.replace(/\s+/g, " ").slice(0, 240),
+    status: raw.status,
+    createdAt: raw.createdAt || new Date().toISOString(),
+    updatedAt:
+      raw.updatedAt ||
+      raw.endedAt ||
+      raw.startedAt ||
+      raw.createdAt ||
+      new Date().toISOString(),
+    startedAt: raw.startedAt ?? null,
+    endedAt: raw.endedAt ?? null,
+    toolCount: raw.toolCount ?? 0,
+    turnCount: raw.turnCount ?? 1,
+    eventCursor: raw.events?.at(-1)?.sequence ?? 0,
+    creator: raw.creator ?? null,
+    originChat: raw.originChat ?? null,
+  };
 };
 const requireProject = (
   projects: ReadonlyMap<string, WorkbenchProject>,
@@ -118,7 +157,7 @@ export const kyootBackend = (
   ) => Promise<unknown> | unknown,
 ): WorkbenchBackend => ({
   listRuns: async () =>
-    (await runs.list()).map((run) => publicRun(run, services.projects)),
+    (await runs.list()).map((run) => publicRunSummary(run, services.projects)),
   listProjects: async () =>
     [...services.projects.values()].map(({ id, name, root }): Project => ({
       id,
@@ -128,6 +167,8 @@ export const kyootBackend = (
     })),
   liveSession: (input) => services.liveSession(input),
   liveSessionPage: (input) => services.liveSessionPage(input),
+  liveTrajectory: (input) => services.liveTrajectory(input),
+  liveTrajectoryEvent: (id) => services.liveTrajectoryEvent(id),
   async getRun(id) {
     return publicRun(await runs.get(id), services.projects);
   },
@@ -153,8 +194,8 @@ export const kyootBackend = (
   async stopRun(id) {
     return publicRun(await runs.stop(id), services.projects);
   },
-  async runEvents(id, after, limit) {
-    return runs.events(id, after, limit);
+  async runEvents(id, after, limit, before) {
+    return runs.events(id, after, limit, before);
   },
   async fileTree(project, path) {
     return (

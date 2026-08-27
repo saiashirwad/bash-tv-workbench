@@ -27,6 +27,10 @@ var ensureWorkflowView = async () => workflowView = (await dynamicImport("/workf
 var ensureTrajectoryView = async () => trajectoryView ??= (await dynamicImport("/trajectory.js")).createTrajectoryView(workbench);
 var projects = [];
 var liveMode = "chat";
+var resolveCollectionsReady;
+var collectionsReady = new Promise(
+  (resolve) => resolveCollectionsReady = resolve
+);
 var paletteMatches = [];
 var paletteIndex = 0;
 var paletteRequest = 0;
@@ -60,8 +64,7 @@ function showPage(page2, push = false) {
     (x) => x.classList.toggle("active", x.dataset.page === page2)
   );
   $$(".page").forEach((x) => x.classList.toggle("hidden", x.id !== page2));
-  if (page2 === "git") gitController.load();
-  if (page2 === "agents") runs.load();
+  if (page2 !== "session") liveChat.stop();
   if (push) navigate(routeFor(page2));
 }
 var esc = escapeHtml;
@@ -132,6 +135,8 @@ var runs = createRunsView({
   queryAll: $$,
   all: () => workbench.runs.all(),
   refresh: () => workbench.engine.refresh(),
+  get: (id, force = false) => workbench.getRun(id).load({ force }),
+  events: (id, input) => workbench.runEventPage(id, input),
   stop: (id) => workbench.stopRun(id),
   compact: (id) => workbench.compactRun(id),
   message: (id, prompt, attribution) => workbench.messageRun(id, prompt, attribution),
@@ -208,7 +213,17 @@ function applySession(s) {
 }
 var liveChat = new LiveChatController(
   {
-    load: (force) => workbench.liveSession({ messages: true }).load({ force }),
+    load: async (force) => {
+      const [session, page2] = await Promise.all([
+        workbench.liveSession({ messages: false }).load({ force }),
+        workbench.liveSessionPage(null, 100)
+      ]);
+      return {
+        ...session,
+        messages: page2.messages,
+        cursor: page2.nextCursor
+      };
+    },
     page: (cursor, limit) => workbench.liveSessionPage(cursor, limit)
   },
   createLiveChatDomView({
@@ -269,7 +284,7 @@ function setProjectMenu(open, focus = false) {
 }
 async function loadProjects() {
   projects = workbench.projects.all();
-  await filesController.loadProjects();
+  filesController.syncProjects(projects);
   gitController.syncProject(currentProject());
 }
 var commandMatches = [];
@@ -430,12 +445,19 @@ async function setLiveTab(tab, push = false) {
   $("#trajectoryTab").setAttribute("aria-selected", String(trajectory));
   $("#liveChatView").classList.toggle("hidden", trajectory);
   $("#trajectoryView").classList.toggle("hidden", !trajectory);
-  if (trajectory) (await ensureTrajectoryView()).load();
+  if (trajectory) {
+    liveChat.stop();
+    void (await ensureTrajectoryView()).load();
+  } else {
+    if (!liveChat.messages.length)
+      void loadSession().finally(() => liveChat.start());
+    else liveChat.start();
+  }
   if (push) navigate(routeFor("session"));
 }
 $("#chatTab").onclick = () => setLiveTab("chat", true);
 $("#trajectoryTab").onclick = () => setLiveTab("trajectory", true);
-$("#trajectorySearch").oninput = async () => (await ensureTrajectoryView()).render();
+$("#trajectorySearch").oninput = async () => (await ensureTrajectoryView()).search($("#trajectorySearch").value);
 $("#collapseTree").onclick = () => filesController.collapse();
 $("#saveFile").onclick = () => filesController.save();
 $("#fileQuery").oninput = queuePalette;
@@ -754,7 +776,9 @@ $("#agentForm").onsubmit = (e) => {
   submitAgent();
 };
 async function routeProject(id) {
+  await collectionsReady;
   const routed = await filesController.routeProject(id);
+  if (routed && !filesController.files.length) await filesController.loadTree();
   if (routed) gitController.syncProject(currentProject());
   return routed;
 }
@@ -770,10 +794,10 @@ function registerRoutes() {
   page("/", () => page.replace("/live"));
   page("/session", () => page.replace("/live"));
   page("/live", (context) => {
-    showPage("session");
     const tab = new URLSearchParams(context.querystring).get("tab");
+    liveMode = tab === "trajectory" ? "trajectory" : "chat";
+    showPage("session");
     void setLiveTab(tab === "trajectory" ? "trajectory" : "chat");
-    loadSession();
   });
   page("/agents", () => {
     runs.clearSelection();
@@ -783,13 +807,12 @@ function registerRoutes() {
   page("/agents/:id", (context) => {
     showPage("agents");
     const id = context.params.id;
-    if (runs.has(id)) runs.select(id, { render: true, push: false });
-    else {
-      runs.load().then(() => {
+    void collectionsReady.then(
+      () => runs.load().then(() => {
         if (runs.has(id)) runs.select(id, { render: true, push: false });
         else page.replace("/agents");
-      });
-    }
+      })
+    );
   });
   page("/files/:project", async (context) => {
     if (!await routeProject(context.params.project)) return;
@@ -834,9 +857,12 @@ workbench.projects.subscribe((value) => {
   filesController.syncProjects(value);
   gitController.syncProject(currentProject());
 });
-ensureWorkbenchSession().then(() => workbench.start()).then(async () => {
-  await Promise.all([loadSession(), loadProjects(), runs.load()]);
+ensureWorkbenchSession().then(() => {
   registerRoutes();
+  return workbench.start();
+}).then(async () => {
+  await Promise.all([loadProjects(), runs.load()]);
+  resolveCollectionsReady();
   $("#workflowsMode").onclick = async () => {
     workflowView = await ensureWorkflowView();
     workflowView.setMode("workflows");
@@ -851,7 +877,6 @@ ensureWorkbenchSession().then(() => workbench.start()).then(async () => {
     console.info(
       webMcp.error ? `WebMCP registration failed: ${webMcp.error}` : `WebMCP ready: ${webMcp.registered} Workbench tools`
     );
-  liveChat.start();
 }).catch((error) => {
   const authError = document.querySelector("#authError");
   if (authError) authError.textContent = errorMessage(error);

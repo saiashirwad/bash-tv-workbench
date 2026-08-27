@@ -1,59 +1,99 @@
 // @ts-expect-error browser deployment module
-import { renderMarkdown } from "/markdown.js";
-// @ts-expect-error browser deployment module
-import { $, $$, escapeHtml } from "/dom.js";
+import { $, escapeHtml } from "/dom.js";
+
+const dynamicImport = (url: string): Promise<any> => import(url);
+let markdownModule: any = null;
 
 function formatDuration(milliseconds) {
   if (milliseconds == null) return "—";
   if (milliseconds < 1000) return `${milliseconds} ms`;
-
   const seconds = Math.round(milliseconds / 1000);
   return seconds < 60
     ? `${seconds}s`
     : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-function summarize(event) {
-  const text =
-    event.type === "tool"
-      ? JSON.stringify(event.args || {})
-      : String(event.text || "");
-  return text.replace(/\s+/g, " ").slice(0, event.type === "tool" ? 180 : 220);
-}
-
-function conversationalContent(event) {
-  if (event.type === "user" || event.type === "assistant") {
-    return `<div class="trajectorymarkdown markdown">${renderMarkdown(event.text)}</div>`;
-  }
-  return `<pre>${escapeHtml(event.text)}</pre>`;
-}
-
-/** Owns trajectory loading, filtering, selection, and inspection. */
+/** Owns paged trajectory summaries and on-demand event inspection. */
 export function createTrajectoryView(store: any) {
   let events: any[] = [];
-  let selectedId = null;
+  let selectedId: string | null = null;
+  let previousCursor: number | null = null;
+  let moreBefore = false;
+  let totalEvents = 0;
+  let query = "";
+  let searchTimer: ReturnType<typeof setTimeout> | null = null;
+  const details = new Map<string, any>();
 
-  function renderInspector() {
-    const event = events.find((item) => item.id === selectedId);
+  function renderOverview(overview) {
+    const total = Math.max(1, totalEvents);
+    $("#trajectoryOverview").innerHTML = `
+      <div class="trajectorytabs">
+        <span>${formatDuration(overview.durationMs)} duration</span>
+        <span>${overview.turns || 0} turns</span>
+        <span>${overview.tools || 0} calls</span>
+      </div>
+      <div class="trajectorybands">
+        <i class="inputband" style="width:${Math.max(3, ((overview.users || 0) / total) * 100)}%"></i>
+        <i class="modelband"></i>
+        <i class="toolband" style="width:${Math.max(3, ((overview.tools || 0) / total) * 100)}%"></i>
+      </div>
+    `;
+  }
+
+  function eventHtml(event) {
+    return `
+      <button
+        class="trajectoryevent ${escapeHtml(event.type)} ${selectedId === event.id ? "selected" : ""}"
+        data-id="${escapeHtml(event.id)}"
+      >
+        <span class="trajectorydot"></span>
+        <span class="trajectorytag">${escapeHtml(event.type)}</span>
+        <b>${escapeHtml(event.label)}</b>
+        <span class="trajectorysummary">${escapeHtml(event.summary || "—")}</span>
+        <small>T${event.turn}${event.durationMs != null ? ` · ${formatDuration(event.durationMs)}` : ""}</small>
+      </button>
+    `;
+  }
+
+  function render() {
+    $("#trajectoryCount").textContent =
+      events.length === totalEvents
+        ? `${totalEvents} events`
+        : `${events.length} of ${totalEvents} events`;
+    $("#trajectoryEvents").innerHTML =
+      `${moreBefore ? '<button class="loadearlier trajectoryload" type="button">Load earlier events</button>' : ""}` +
+      (events.map(eventHtml).join("") ||
+        '<div class="trajectoryempty">No events</div>');
+  }
+
+  async function renderInspector(event) {
     if (!event) {
       $("#trajectoryInspect").innerHTML =
         '<div class="trajectoryempty">Select an event</div>';
       return;
     }
-
+    let content = "";
+    if (event.text) {
+      if (event.type === "user" || event.type === "assistant") {
+        markdownModule ??= await dynamicImport("/markdown.js");
+        content = `<h3>Content</h3><div class="trajectorymarkdown markdown">${markdownModule.renderMarkdown(event.text)}</div>`;
+      } else {
+        content = `<h3>${event.type === "result" ? "Result" : "Content"}</h3><pre>${escapeHtml(event.text)}</pre>`;
+      }
+    }
     const payload = event.args
       ? `<h3>Payload</h3><pre>${escapeHtml(JSON.stringify(event.args, null, 2))}</pre>`
       : "";
-    const content = event.text
-      ? `<h3>${event.type === "result" ? "Result" : "Content"}</h3>${conversationalContent(event)}`
+    const detailsHtml = event.details
+      ? `<h3>Details</h3><pre>${escapeHtml(JSON.stringify(event.details, null, 2))}</pre>`
       : "";
     const usage = event.usage
       ? `<h3>Usage</h3><pre>${escapeHtml(JSON.stringify(event.usage, null, 2))}</pre>`
       : "";
-
+    if (selectedId !== event.id) return;
     $("#trajectoryInspect").innerHTML = `
       <div class="inspecthead">
-        <span class="trajectorytag ${event.type}">${escapeHtml(event.type)}</span>
+        <span class="trajectorytag ${escapeHtml(event.type)}">${escapeHtml(event.type)}</span>
         <b>${escapeHtml(event.label)}</b>
       </div>
       <dl>
@@ -62,71 +102,66 @@ export function createTrajectoryView(store: any) {
         <dt>Duration</dt><dd>${formatDuration(event.durationMs)}</dd>
         ${event.toolName ? `<dt>Tool</dt><dd>${escapeHtml(event.toolName)}</dd>` : ""}
       </dl>
-      ${payload}${content}${usage}
+      ${payload}${content}${detailsHtml}${usage}
     `;
   }
 
-  function render() {
-    const query = $("#trajectorySearch")?.value.trim().toLowerCase() || "";
-    const visible = events.filter((event) => {
-      const searchable = `${event.type} ${event.label} ${summarize(event)}`;
-      return !query || searchable.toLowerCase().includes(query);
-    });
-
-    $("#trajectoryCount").textContent = `${visible.length} events`;
-    $("#trajectoryEvents").innerHTML =
-      visible
-        .map(
-          (event) => `
-            <button
-              class="trajectoryevent ${event.type} ${selectedId === event.id ? "selected" : ""}"
-              data-id="${escapeHtml(event.id)}"
-            >
-              <span class="trajectorydot"></span>
-              <span class="trajectorytag">${escapeHtml(event.type)}</span>
-              <b>${escapeHtml(event.label)}</b>
-              <span class="trajectorysummary">${escapeHtml(summarize(event) || "—")}</span>
-              <small>T${event.turn}${event.durationMs != null ? ` · ${formatDuration(event.durationMs)}` : ""}</small>
-            </button>
-          `,
-        )
-        .join("") || '<div class="trajectoryempty">No events</div>';
-
-    $$(".trajectoryevent").forEach((button) => {
-      button.onclick = () => {
-        selectedId = button.dataset.id;
-        render();
-        renderInspector();
-      };
-    });
+  async function select(id) {
+    selectedId = id;
+    $("#trajectoryEvents .selected")?.classList.remove("selected");
+    $(`#trajectoryEvents [data-id="${CSS.escape(id)}"]`)?.classList.add(
+      "selected",
+    );
+    const cached = details.get(id);
+    if (cached) return renderInspector(cached);
+    $("#trajectoryInspect").innerHTML =
+      '<div class="trajectoryempty">Loading event details…</div>';
+    try {
+      const detail = await store.liveTrajectoryEvent(id).load();
+      details.set(id, detail);
+      await renderInspector(detail);
+    } catch (error) {
+      if (selectedId === id)
+        $("#trajectoryInspect").innerHTML =
+          `<div class="trajectoryempty">${escapeHtml(error?.message || String(error))}</div>`;
+    }
   }
 
-  function renderOverview(trajectory) {
-    const tools = events.filter((event) => event.type === "tool").length;
-    const users = events.filter((event) => event.type === "user").length;
-    const total = Math.max(1, events.length);
-
-    $("#trajectoryOverview").innerHTML = `
-      <div class="trajectorytabs">
-        <span>${formatDuration(trajectory.durationMs)} duration</span>
-        <span>${trajectory.turns || 0} turns</span>
-        <span>${tools} calls</span>
-      </div>
-      <div class="trajectorybands">
-        <i class="inputband" style="width:${Math.max(3, (users / total) * 100)}%"></i>
-        <i class="modelband"></i>
-        <i class="toolband" style="width:${Math.max(3, (tools / total) * 100)}%"></i>
-      </div>
-    `;
-  }
-
-  async function load(force = false) {
-    const data = await store.liveSession({ trajectory: true }).load({ force });
-    const trajectory = data?.trajectory || { events: [] };
-    events = trajectory.events;
-    renderOverview(trajectory);
+  async function load(force = false, before: number | null = null) {
+    const page = await store
+      .liveTrajectory({ before, limit: 100, query })
+      .load({ force });
+    if (before == null) events = [...page.events];
+    else {
+      const known = new Set(events.map((event) => event.id));
+      events = [
+        ...page.events.filter((event) => !known.has(event.id)),
+        ...events,
+      ];
+    }
+    previousCursor = page.previousCursor;
+    moreBefore = page.moreBefore;
+    totalEvents = page.total;
+    renderOverview(page.overview);
     render();
   }
 
-  return { load, render };
+  function search(value: string) {
+    query = value.trim();
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => void load(true), 150);
+  }
+
+  $("#trajectoryEvents").addEventListener("click", (event) => {
+    const target = event.target as Element;
+    if (target.closest(".trajectoryload")) {
+      if (moreBefore && previousCursor != null)
+        void load(false, previousCursor);
+      return;
+    }
+    const button = target.closest<HTMLElement>(".trajectoryevent");
+    if (button?.dataset.id) void select(button.dataset.id);
+  });
+
+  return { load, render, search };
 }

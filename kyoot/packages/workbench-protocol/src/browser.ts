@@ -13,6 +13,8 @@ import {
   type LiveMessagePage,
   type Project,
   type Run,
+  type RunSummary,
+  type TrajectoryEventSummary,
   type Workflow,
   type WorkflowEvent,
   type WorkflowTask,
@@ -58,15 +60,41 @@ export type PlatformInput = Readonly<
 >;
 
 export interface WorkbenchStore {
-  readonly runs: Collection<Run>;
+  readonly runs: Collection<RunSummary>;
   readonly projects: Collection<Project>;
   readonly workflows: Collection<Workflow>;
   readonly engine: Engine;
   readonly queries: QueryCache;
   start(): Promise<void>;
   stop(): void;
-  liveSession(input?: { readonly messages?: boolean; readonly trajectory?: boolean }): Query<any>;
-  liveSessionPage(cursor?: string | null, limit?: number): Promise<LiveMessagePage>;
+  liveSession(input?: {
+    readonly messages?: boolean;
+    readonly trajectory?: boolean;
+  }): Query<any>;
+  liveSessionPage(
+    cursor?: string | null,
+    limit?: number,
+  ): Promise<LiveMessagePage>;
+  liveTrajectory(input?: {
+    readonly before?: number | null;
+    readonly limit?: number;
+    readonly query?: string;
+  }): Query<{
+    readonly events: readonly TrajectoryEventSummary[];
+    readonly previousCursor: number | null;
+    readonly moreBefore: boolean;
+    readonly total: number;
+    readonly overview: {
+      readonly turns: number;
+      readonly tools: number;
+      readonly users: number;
+      readonly start: string | null;
+      readonly end: string | null;
+      readonly durationMs: number;
+    };
+  }>;
+  liveTrajectoryEvent(id: string): Query<any>;
+  getRun(id: string): Query<Run>;
   createRun(input: {
     readonly id?: string;
     readonly project: string;
@@ -89,7 +117,25 @@ export interface WorkbenchStore {
   ): Promise<{
     readonly events: readonly unknown[];
     readonly nextCursor: number;
+    readonly previousCursor: number | null;
     readonly more: boolean;
+    readonly moreBefore: boolean;
+    readonly reset: boolean;
+    readonly completed: boolean;
+  }>;
+  runEventPage(
+    id: string,
+    input?: {
+      readonly after?: number;
+      readonly before?: number | null;
+      readonly limit?: number;
+    },
+  ): Promise<{
+    readonly events: readonly unknown[];
+    readonly nextCursor: number;
+    readonly previousCursor: number | null;
+    readonly more: boolean;
+    readonly moreBefore: boolean;
     readonly reset: boolean;
     readonly completed: boolean;
   }>;
@@ -163,7 +209,10 @@ export interface WorkbenchStore {
     project: string,
     commit: string,
   ): Query<{ readonly commit: string; readonly diff: string }>;
-  invokePlatform(operation: PlatformOperationName, input?: PlatformInput): Promise<unknown>;
+  invokePlatform(
+    operation: PlatformOperationName,
+    input?: PlatformInput,
+  ): Promise<unknown>;
   createWorkflow(input: {
     readonly id?: string;
     readonly title: string;
@@ -182,7 +231,10 @@ export interface WorkbenchStore {
     readonly failurePolicy?: "fail-fast" | "continue";
     readonly metadata?: Readonly<Record<string, unknown>>;
   }): Promise<Workflow>;
-  addWorkflowTasks(workflowId: string, tasks: readonly any[]): Promise<readonly WorkflowTask[]>;
+  addWorkflowTasks(
+    workflowId: string,
+    tasks: readonly any[],
+  ): Promise<readonly WorkflowTask[]>;
   cancelWorkflow(id: string): Promise<Workflow>;
   cancelWorkflowTask(workflowId: string, taskId: string): Promise<WorkflowTask>;
   retryWorkflowTask(workflowId: string, taskId: string): Promise<WorkflowTask>;
@@ -224,7 +276,9 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
   const queries = queryCache();
   let invalidationRevision = 0;
   const run = <A>(program: import("kyoot").Kyoot<A, any>) =>
-    Kyoot.runPromise(program.pipe(provide(rpcTransport), Fail.orThrow) as never) as Promise<A>;
+    Kyoot.runPromise(
+      program.pipe(provide(rpcTransport), Fail.orThrow) as never,
+    ) as Promise<A>;
   const query = <A>(key: readonly string[], load: () => Promise<A>) =>
     queries.query(key, () => load());
   const mutate = async <A>(
@@ -234,7 +288,8 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
     const ack = await engine.mutate(mutation.type, mutation.input, optimistic);
     return ack.result as A;
   };
-  const id = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+  const id = () =>
+    globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
   const now = () => new Date().toISOString();
   const put = (collection: string, value: { readonly id: string }) => ({
     collection,
@@ -244,7 +299,8 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
   });
   const workflowCounts = (tasks: Workflow["tasks"]) => {
     const counts: Record<string, number> = {};
-    for (const task of Object.values(tasks)) counts[task.status] = (counts[task.status] ?? 0) + 1;
+    for (const task of Object.values(tasks))
+      counts[task.status] = (counts[task.status] ?? 0) + 1;
     return counts;
   };
   const update =
@@ -258,7 +314,7 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
       return current ? [put(collection, patch(current))] : [];
     };
   return {
-    runs: engine.collection<Run>("runs"),
+    runs: engine.collection<RunSummary>("runs"),
     projects: engine.collection<Project>("projects"),
     workflows: engine.collection<Workflow>("workflows"),
     engine,
@@ -271,34 +327,45 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
     liveSession(input = {}) {
       const messages = input.messages ?? false;
       const trajectory = input.trajectory ?? false;
-      return query(["live", messages ? "messages" : "", trajectory ? "trajectory" : ""], () =>
-        run(WorkbenchClient.live.session({ messages, trajectory })),
+      return query(
+        ["live", messages ? "messages" : "", trajectory ? "trajectory" : ""],
+        () => run(WorkbenchClient.live.session({ messages, trajectory })),
       );
     },
     liveSessionPage: (cursor = null, limit = 100) =>
       run(WorkbenchClient.live.page({ cursor, limit })),
+    liveTrajectory(input = {}) {
+      const request = {
+        before: input.before ?? null,
+        limit: input.limit ?? 100,
+        query: input.query ?? "",
+      };
+      return query(["live", "trajectory-page", JSON.stringify(request)], () =>
+        run(WorkbenchClient.live.trajectory(request)),
+      );
+    },
+    liveTrajectoryEvent: (id) =>
+      query(["live", "trajectory-event", id], () =>
+        run(WorkbenchClient.live.trajectoryEvent({ id })),
+      ),
+    getRun: (id) =>
+      query(["run", id], () => run(WorkbenchClient.runs.get({ id }))),
     async createRun(input) {
       const runId = input.id ?? id();
       const createdAt = now();
-      const optimistic: Run = {
+      const optimistic: RunSummary = {
         id: runId,
         project: input.project,
         title: input.title || input.prompt.split("\n")[0] || "Agent",
-        prompt: input.prompt,
+        promptPreview: input.prompt.replace(/\s+/g, " ").slice(0, 240),
         status: "queued",
         createdAt,
         updatedAt: createdAt,
         startedAt: null,
         endedAt: null,
-        pid: null,
-        exitCode: null,
-        output: "",
-        error: null,
-        events: [],
-        usage: null,
-        changes: [],
         toolCount: 0,
         turnCount: 1,
+        eventCursor: 0,
         creator: input.creator ?? null,
         originChat: input.originChat ?? null,
       };
@@ -309,31 +376,18 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
     messageRun: (runId, message, attribution = {}) =>
       mutate<Run>(
         SyncMutations.messageRun({ id: runId, message, ...attribution }),
-        update<Run>("runs", runId, (run) => ({
+        update<RunSummary>("runs", runId, (run) => ({
           ...run,
           status: "queued",
           updatedAt: now(),
           endedAt: null,
-          error: null,
           turnCount: (run.turnCount ?? 1) + 1,
-          events: [
-            ...(run.events ?? []),
-            {
-              id: `optimistic-${id()}`,
-              at: now(),
-              type: "user",
-              text: message,
-              creator: attribution.creator ?? run.creator ?? null,
-              originChat: attribution.originChat ?? run.originChat ?? null,
-              optimistic: true,
-            },
-          ],
         })),
       ),
     compactRun: (runId) =>
       mutate<Run>(
         SyncMutations.compactRun(runId),
-        update<Run>("runs", runId, (run) => ({
+        update<RunSummary>("runs", runId, (run) => ({
           ...run,
           status: "compacting",
           updatedAt: now(),
@@ -342,11 +396,20 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
         })),
       ),
     runEvents: (id, after = 0, limit = 100) =>
-      run(WorkbenchClient.runs.events({ id, after, limit })),
+      run(WorkbenchClient.runs.events({ id, after, before: null, limit })),
+    runEventPage: (id, input = {}) =>
+      run(
+        WorkbenchClient.runs.events({
+          id,
+          after: input.after ?? 0,
+          before: input.before ?? null,
+          limit: input.limit ?? 100,
+        }),
+      ),
     stopRun: (runId) =>
       mutate<Run>(
         SyncMutations.stopRun(runId),
-        update<Run>("runs", runId, (run) => ({
+        update<RunSummary>("runs", runId, (run) => ({
           ...run,
           status: run.status === "queued" ? "stopped" : "stopping",
           updatedAt: now(),
@@ -354,9 +417,13 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
         })),
       ),
     fileTree: (project, path = "") =>
-      query(["tree", project, path], () => run(WorkbenchClient.files.tree({ project, path }))),
+      query(["tree", project, path], () =>
+        run(WorkbenchClient.files.tree({ project, path })),
+      ),
     readFile: (project, path) =>
-      query(["file", project, path], () => run(WorkbenchClient.files.read({ project, path }))),
+      query(["file", project, path], () =>
+        run(WorkbenchClient.files.read({ project, path })),
+      ),
     async writeFile(input) {
       const cached = query(["file", input.project, input.path], () =>
         run(
@@ -368,7 +435,10 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
       );
       const previous = cached.get();
       if (previous.value)
-        cached.set({ ...previous.value, content: input.content, binary: false }, { stale: true });
+        cached.set(
+          { ...previous.value, content: input.content, binary: false },
+          { stale: true },
+        );
       queries.invalidate(["tree", input.project]);
       queries.invalidate(["git", "status", input.project]);
       try {
@@ -433,7 +503,9 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
             ...task,
             dependsOn: task.dependsOn ? [...task.dependsOn] : undefined,
             workflowId,
-            status: task.dependsOn?.length ? ("blocked" as const) : ("queued" as const),
+            status: task.dependsOn?.length
+              ? ("blocked" as const)
+              : ("queued" as const),
             attempt: 0,
             createdAt,
             startedAt: null,
@@ -461,9 +533,10 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
         counts: workflowCounts(tasks),
         error: null,
       };
-      return mutate<Workflow>(SyncMutations.createWorkflow({ ...input, id: workflowId } as never), [
-        put("workflows", optimistic),
-      ]);
+      return mutate<Workflow>(
+        SyncMutations.createWorkflow({ ...input, id: workflowId } as never),
+        [put("workflows", optimistic)],
+      );
     },
     addWorkflowTasks: (workflowId, tasks) =>
       mutate<readonly WorkflowTask[]>(
@@ -596,7 +669,8 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
                 yield event;
               }
             } catch {
-              if (!stopped) await new Promise((resolve) => setTimeout(resolve, 250));
+              if (!stopped)
+                await new Promise((resolve) => setTimeout(resolve, 250));
             }
           }
         },
@@ -606,8 +680,11 @@ export const browserStore = (options: BrowserOptions = {}): WorkbenchStore => {
       } as AsyncIterable<WorkflowEvent> & { stop(): void };
     },
     async refreshInvalidations() {
-      const next = await run(WorkbenchClient.invalidations.since({ after: invalidationRevision }));
-      for (const item of next.items) for (const key of item.keys) queries.invalidate(key);
+      const next = await run(
+        WorkbenchClient.invalidations.since({ after: invalidationRevision }),
+      );
+      for (const item of next.items)
+        for (const key of item.keys) queries.invalidate(key);
       invalidationRevision = next.revision;
     },
   };

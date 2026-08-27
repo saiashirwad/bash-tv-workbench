@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { api, client, mutation, query, stream } from "@kyoot/rpc";
-export { SyncRpc, fromRpc as syncFromRpc, handlers as syncHandlers } from "@kyoot/sync/rpc";
+export {
+  SyncRpc,
+  fromRpc as syncFromRpc,
+  handlers as syncHandlers,
+} from "@kyoot/sync/rpc";
 
 export const RunStatus = z.enum([
   "queued",
@@ -41,6 +45,36 @@ export const Run = z
   })
   .catchall(z.unknown());
 export type Run = z.output<typeof Run>;
+export const RunSummary = z.object({
+  id: z.string(),
+  project: z.string(),
+  title: z.string(),
+  promptPreview: z.string(),
+  status: RunStatus,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  startedAt: z.string().nullable().optional(),
+  endedAt: z.string().nullable().optional(),
+  toolCount: z.number().int().nonnegative(),
+  turnCount: z.number().int().positive(),
+  eventCursor: z.number().int().nonnegative(),
+  creator: z.unknown().nullable().optional(),
+  originChat: z.unknown().nullable().optional(),
+});
+export type RunSummary = z.output<typeof RunSummary>;
+export const TrajectoryEventSummary = z.object({
+  id: z.string(),
+  sequence: z.number().int().positive(),
+  type: z.string(),
+  turn: z.number().int().nonnegative(),
+  at: z.string().nullable(),
+  label: z.string(),
+  summary: z.string(),
+  toolName: z.string().optional(),
+  durationMs: z.number().nonnegative().nullable().optional(),
+  isError: z.boolean().optional(),
+});
+export type TrajectoryEventSummary = z.output<typeof TrajectoryEventSummary>;
 export const Project = z.object({
   id: z.string(),
   name: z.string(),
@@ -172,12 +206,21 @@ const DomainError = z.object({
   _tag: z.string(),
   message: z.string(),
   operation: z.string().optional(),
-  issues: z.array(z.object({ path: z.string(), code: z.string(), message: z.string() })).optional(),
+  issues: z
+    .array(
+      z.object({ path: z.string(), code: z.string(), message: z.string() }),
+    )
+    .optional(),
 });
 
 /** On-demand operations. Replicated runs/projects use SyncRpc. */
 export const WorkbenchRpc = api("workbench", {
   runs: {
+    list: query({
+      input: Empty,
+      output: z.array(RunSummary),
+      error: DomainError,
+    }),
     get: query({ input: RunId, output: Run, error: DomainError }),
     create: mutation({
       input: z.object({
@@ -207,12 +250,15 @@ export const WorkbenchRpc = api("workbench", {
       input: z.object({
         id: z.string(),
         after: z.number().int().nonnegative().default(0),
+        before: z.number().int().positive().nullable().default(null),
         limit: z.number().int().positive().max(1000).default(100),
       }),
       output: z.object({
         events: z.array(z.unknown()),
         nextCursor: z.number().int().nonnegative(),
+        previousCursor: z.number().int().positive().nullable(),
         more: z.boolean(),
+        moreBefore: z.boolean(),
         reset: z.boolean(),
         completed: z.boolean(),
       }),
@@ -237,6 +283,33 @@ export const WorkbenchRpc = api("workbench", {
         limit: z.number().int().positive().max(250).default(100),
       }),
       output: LiveMessagePage,
+      error: DomainError,
+    }),
+    trajectory: query({
+      input: z.object({
+        before: z.number().int().positive().nullable().default(null),
+        limit: z.number().int().positive().max(250).default(100),
+        query: z.string().max(500).default(""),
+      }),
+      output: z.object({
+        events: z.array(TrajectoryEventSummary),
+        previousCursor: z.number().int().positive().nullable(),
+        moreBefore: z.boolean(),
+        total: z.number().int().nonnegative(),
+        overview: z.object({
+          turns: z.number().int().nonnegative(),
+          tools: z.number().int().nonnegative(),
+          users: z.number().int().nonnegative(),
+          start: z.string().nullable(),
+          end: z.string().nullable(),
+          durationMs: z.number().nonnegative(),
+        }),
+      }),
+      error: DomainError,
+    }),
+    trajectoryEvent: query({
+      input: z.object({ id: z.string() }),
+      output: z.unknown(),
       error: DomainError,
     }),
   },
@@ -461,11 +534,16 @@ export const SyncMutations = {
     readonly content: string;
     readonly expectedRevision?: string;
   }) => ({ type: "files/write", input }),
-  createWorkflow: (input: z.input<typeof WorkbenchRpc.shape.workflows.create.input>) => ({
+  createWorkflow: (
+    input: z.input<typeof WorkbenchRpc.shape.workflows.create.input>,
+  ) => ({
     type: "workflows/create",
     input,
   }),
-  addWorkflowTasks: (workflowId: string, tasks: z.input<typeof WorkflowTaskSpec>[]) => ({
+  addWorkflowTasks: (
+    workflowId: string,
+    tasks: z.input<typeof WorkflowTaskSpec>[],
+  ) => ({
     type: "workflows/add-tasks",
     input: { workflowId, tasks },
   }),

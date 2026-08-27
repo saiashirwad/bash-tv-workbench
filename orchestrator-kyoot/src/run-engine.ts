@@ -23,7 +23,12 @@ export interface RunContext {
   readonly started: (pid?: number) => Promise<void>;
 }
 export interface RunExecutor {
-  turn(run: Run, prompt: string, continuing: boolean, context: RunContext): Promise<RunExecution>;
+  turn(
+    run: Run,
+    prompt: string,
+    continuing: boolean,
+    context: RunContext,
+  ): Promise<RunExecution>;
   compact(run: Run, context: RunContext): Promise<RunExecution>;
 }
 export interface RunEngineOptions {
@@ -48,10 +53,13 @@ export interface RunEngine {
     id: string,
     after?: number,
     limit?: number,
+    before?: number | null,
   ): Promise<{
     events: readonly RunEvent[];
     nextCursor: number;
+    previousCursor: number | null;
     more: boolean;
+    moreBefore: boolean;
     reset: boolean;
     completed: boolean;
   }>;
@@ -59,8 +67,15 @@ export interface RunEngine {
   shutdown(): Promise<void>;
 }
 
-const activeStatus = new Set(["queued", "starting", "running", "compacting", "stopping"]);
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const activeStatus = new Set([
+  "queued",
+  "starting",
+  "running",
+  "compacting",
+  "stopping",
+]);
+const errorText = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 
 export const makeRunEngine = async (
   store: RunStore,
@@ -133,13 +148,15 @@ export const makeRunEngine = async (
             at: now(),
             ...event,
           } as RunEvent;
-          const persisted = (await store.appendEvent?.(id, nextEvent)) ?? nextEvent;
+          const persisted =
+            (await store.appendEvent?.(id, nextEvent)) ?? nextEvent;
           await publish({
             ...current,
             events: [...current.events, persisted].slice(-500),
             artifactReferences: [
               ...(current.artifactReferences ?? []),
-              ...((persisted.artifactReferences as Run["artifactReferences"]) ?? []),
+              ...((persisted.artifactReferences as Run["artifactReferences"]) ??
+                []),
             ].slice(-256),
           });
         });
@@ -158,7 +175,11 @@ export const makeRunEngine = async (
       const prompt = run.pendingPrompt ?? run.prompt;
       const result =
         run.operation === "compact"
-          ? await executor.compact(run, { signal: controller.signal, emit, started })
+          ? await executor.compact(run, {
+              signal: controller.signal,
+              emit,
+              started,
+            })
           : await executor.turn(run, prompt, run.turnCount > 1, {
               signal: controller.signal,
               emit,
@@ -184,7 +205,8 @@ export const makeRunEngine = async (
     } catch (error) {
       await locked(id, async () => {
         const current = await requireRun(id);
-        const cancelled = controller.signal.aborted || current.status === "stopping";
+        const cancelled =
+          controller.signal.aborted || current.status === "stopping";
         await publish({
           ...current,
           status: cancelled ? "stopped" : "failed",
@@ -221,7 +243,9 @@ export const makeRunEngine = async (
     locked(id, async () => {
       const current = await requireRun(id);
       if (activeStatus.has(current.status))
-        throw Object.assign(new Error("Run already has an active operation"), { status: 409 });
+        throw Object.assign(new Error("Run already has an active operation"), {
+          status: 409,
+        });
       const next = await publish({
         ...current,
         ...patch,
@@ -236,15 +260,21 @@ export const makeRunEngine = async (
 
   const engine: RunEngine = {
     list: async () =>
-      [...(await store.list())].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      [...(await store.list())].sort((a, b) =>
+        b.createdAt.localeCompare(a.createdAt),
+      ),
     get: requireRun,
     create: async (input) => {
       const prompt = input.prompt.trim();
       if (!prompt || prompt.length > 20_000)
-        throw Object.assign(new Error("Prompt must be 1–20,000 characters"), { status: 400 });
+        throw Object.assign(new Error("Prompt must be 1–20,000 characters"), {
+          status: 400,
+        });
       const id = input.id ?? options.id?.() ?? crypto.randomUUID();
       if (await store.get(id))
-        throw Object.assign(new Error("Run id already exists"), { status: 409 });
+        throw Object.assign(new Error("Run id already exists"), {
+          status: 409,
+        });
       const createdAt = now();
       const run: Run = {
         version: 1,
@@ -279,7 +309,9 @@ export const makeRunEngine = async (
     message: async (id, prompt, attribution = {}) => {
       const message = prompt.trim();
       if (!message || message.length > 20_000)
-        throw Object.assign(new Error("Prompt must be 1–20,000 characters"), { status: 400 });
+        throw Object.assign(new Error("Prompt must be 1–20,000 characters"), {
+          status: 400,
+        });
       const current = await requireRun(id);
       const event = {
         id: crypto.randomUUID(),
@@ -290,7 +322,8 @@ export const makeRunEngine = async (
         creator: attribution.creator ?? current.creator,
         originChat: attribution.originChat ?? current.originChat,
       };
-      const persisted: RunEvent = (await store.appendEvent?.(id, event)) ?? event;
+      const persisted: RunEvent =
+        (await store.appendEvent?.(id, event)) ?? event;
       return enqueueExisting(id, {
         operation: "turn",
         pendingPrompt: message,
@@ -298,31 +331,61 @@ export const makeRunEngine = async (
         events: [...current.events, persisted].slice(-500),
         artifactReferences: [
           ...(current.artifactReferences ?? []),
-          ...((persisted.artifactReferences as Run["artifactReferences"]) ?? []),
+          ...((persisted.artifactReferences as Run["artifactReferences"]) ??
+            []),
         ].slice(-256),
       });
     },
-    compact: (id) => enqueueExisting(id, { operation: "compact", pendingPrompt: null }),
+    compact: (id) =>
+      enqueueExisting(id, { operation: "compact", pendingPrompt: null }),
     stop: (id) =>
       locked(id, async () => {
         const current = await requireRun(id);
         if (!activeStatus.has(current.status)) return current;
         if (current.status === "queued")
-          return publish({ ...current, status: "stopped", endedAt: now(), pendingPrompt: null });
+          return publish({
+            ...current,
+            status: "stopped",
+            endedAt: now(),
+            pendingPrompt: null,
+          });
         const next = await publish({ ...current, status: "stopping" });
         controllers.get(id)?.abort();
         return next;
       }),
-    events: async (id, after = 0, limit = 100) => {
+    events: async (id, after = 0, limit = 100, before = null) => {
       const run = await requireRun(id);
-      const page = store.readEvents
-        ? await store.readEvents(id, after, Math.max(1, Math.min(1000, limit)))
-        : {
-            events: run.events.filter((event) => (event.sequence ?? 0) > after).slice(0, limit),
-            nextCursor: run.events.at(-1)?.sequence ?? after,
-            more: false,
-            reset: false,
-          };
+      const page = store.readEventPage
+        ? await store.readEventPage(id, {
+            after,
+            before,
+            limit: Math.max(1, Math.min(1000, limit)),
+          })
+        : store.readEvents && before == null
+          ? {
+              ...(await store.readEvents(
+                id,
+                after,
+                Math.max(1, Math.min(1000, limit)),
+              )),
+              previousCursor: null,
+              moreBefore: false,
+            }
+          : {
+              events:
+                before == null
+                  ? run.events
+                      .filter((event) => (event.sequence ?? 0) > after)
+                      .slice(0, limit)
+                  : run.events
+                      .filter((event) => (event.sequence ?? 0) < before)
+                      .slice(-limit),
+              nextCursor: run.events.at(-1)?.sequence ?? after,
+              previousCursor: run.events.at(0)?.sequence ?? null,
+              more: before == null && run.events.length > limit,
+              moreBefore: before != null && run.events.length > limit,
+              reset: false,
+            };
       return { ...page, completed: !activeStatus.has(run.status) };
     },
     subscribe: (listener) => {
@@ -333,7 +396,8 @@ export const makeRunEngine = async (
       stopped = true;
       if (wake) clearTimeout(wake);
       for (const controller of controllers.values()) controller.abort();
-      while (active > 0) await new Promise((resolve) => setTimeout(resolve, 20));
+      while (active > 0)
+        await new Promise((resolve) => setTimeout(resolve, 20));
       await store.flush();
     },
   };

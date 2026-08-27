@@ -140,7 +140,12 @@ install() {
   info "Building committed runtime assets"
   "$MISE" exec -- npm run build
   prepare_state
+  mkdir -p "$HOME/.local/bin"
+  chmod +x bin/bash-workbench.mjs
+  ln -sfn "$ROOT/bin/bash-workbench.mjs" "$HOME/.local/bin/bash-workbench"
+  ln -sfn "$ROOT/bin/bash-workbench.mjs" "$HOME/.local/bin/bw"
   ok "Kyoot Workbench installed in place at $ROOT"
+  ok "Workbench CLI installed: $HOME/.local/bin/bash-workbench"
   chmod +x bootstrap.sh scripts/setup-space.sh
   info "Next: start 'bash ./bootstrap.sh serve' with the Bash.tv coding tool's detached/tmux mode."
 }

@@ -9,6 +9,7 @@ import {
   type GitCommit,
   type Project,
   type Run,
+  type RunSummary,
   type Workflow,
   type WorkflowEvent,
   type WorkflowTask,
@@ -40,7 +41,7 @@ export interface WorkflowBackend {
 }
 
 export interface WorkbenchBackend {
-  listRuns(): Promise<readonly Run[]>;
+  listRuns(): Promise<readonly RunSummary[]>;
   listProjects(): Promise<readonly Project[]>;
   liveSession(input: {
     readonly messages?: boolean;
@@ -56,6 +57,12 @@ export interface WorkbenchBackend {
     readonly more: boolean;
     readonly completed: boolean;
   }>;
+  liveTrajectory?(input: {
+    readonly before?: number | null;
+    readonly limit?: number;
+    readonly query?: string;
+  }): Promise<any>;
+  liveTrajectoryEvent?(id: string): Promise<any>;
   getRun(id: string): Promise<Run>;
   createRun(input: {
     readonly id?: string;
@@ -77,10 +84,13 @@ export interface WorkbenchBackend {
     id: string,
     after?: number,
     limit?: number,
+    before?: number | null,
   ): Promise<{
     readonly events: readonly unknown[];
     readonly nextCursor: number;
+    readonly previousCursor: number | null;
     readonly more: boolean;
+    readonly moreBefore: boolean;
     readonly reset: boolean;
     readonly completed: boolean;
   }>;
@@ -110,17 +120,20 @@ export interface WorkbenchBackend {
     readonly query: string;
     readonly limit: number;
   }): Promise<readonly { readonly path: string; readonly name: string }[]>;
-  contentSearch?(input: {
-    readonly project: string;
-    readonly query: string;
-    readonly regex?: boolean;
-    readonly include?: readonly string[];
-    readonly exclude?: readonly string[];
-    readonly limit?: number;
-    readonly maxFileSize?: number;
-    readonly contextLines?: number;
-    readonly timeoutMs?: number;
-  }, options?: { readonly signal?: AbortSignal }): Promise<{
+  contentSearch?(
+    input: {
+      readonly project: string;
+      readonly query: string;
+      readonly regex?: boolean;
+      readonly include?: readonly string[];
+      readonly exclude?: readonly string[];
+      readonly limit?: number;
+      readonly maxFileSize?: number;
+      readonly contextLines?: number;
+      readonly timeoutMs?: number;
+    },
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<{
     readonly matches: readonly {
       readonly path: string;
       readonly line: number;
@@ -161,11 +174,31 @@ export interface WorkbenchBackend {
   ): Promise<unknown> | unknown;
 }
 
-const putRun = (run: Run): Change => ({
+const putRun = (run: RunSummary): Change => ({
   collection: "runs",
   operation: "put",
   key: run.id,
   value: run,
+});
+export const summarizeRun = (run: Run): RunSummary => ({
+  id: run.id,
+  project: run.project,
+  title: run.title || run.prompt?.split("\n")[0] || "Agent",
+  promptPreview: String(run.prompt || "")
+    .replace(/\s+/g, " ")
+    .slice(0, 240),
+  status: run.status,
+  createdAt: run.createdAt,
+  updatedAt: run.updatedAt,
+  startedAt: run.startedAt ?? null,
+  endedAt: run.endedAt ?? null,
+  toolCount: run.toolCount ?? 0,
+  turnCount: run.turnCount ?? 1,
+  eventCursor:
+    Number((run.events?.at(-1) as any)?.sequence) ||
+    Number((run as any).eventCursor || 0),
+  creator: run.creator ?? null,
+  originChat: run.originChat ?? null,
 });
 const putWorkflow = (workflow: Workflow): Change => ({
   collection: "workflows",
@@ -206,8 +239,9 @@ export const makeTypedApi = async (
   ]);
   let runState = new Map(runs.map((run) => [run.id, JSON.stringify(run)]));
   const mutationResult = (run: Run) => {
-    runState.set(run.id, JSON.stringify(run));
-    return { changes: [putRun(run)], result: run };
+    const summary = summarizeRun(run);
+    runState.set(run.id, JSON.stringify(summary));
+    return { changes: [putRun(summary)], result: run };
   };
   const sync = authority({
     initial: { runs, projects, workflows },
@@ -331,6 +365,14 @@ export const makeTypedApi = async (
     if (changes.length) sync.commit(changes);
     return changes.length;
   };
+  const refreshRun = async (id: string) => {
+    const summary = summarizeRun(await backend.getRun(id));
+    const serialized = JSON.stringify(summary);
+    if (runState.get(id) === serialized) return false;
+    runState.set(id, serialized);
+    sync.commit([putRun(summary)]);
+    return true;
+  };
   if (workflowBackend)
     workflowBackend.subscribe((event) => {
       if (
@@ -355,43 +397,50 @@ export const makeTypedApi = async (
 
   const workbench = router(WorkbenchRpc, {
     runs: {
+      list: () => promise(async () => [...(await backend.listRuns())]),
       get: ({ id }) => promise(() => backend.getRun(id)),
       create: (input) =>
         promise(async () => {
           const run = await backend.createRun(input);
-          runState.set(run.id, JSON.stringify(run));
-          sync.commit([putRun(run)]);
+          const summary = summarizeRun(run);
+          runState.set(run.id, JSON.stringify(summary));
+          sync.commit([putRun(summary)]);
           return run;
         }),
       message: (input) =>
         promise(async () => {
           const run = await backend.messageRun(input);
-          runState.set(run.id, JSON.stringify(run));
-          sync.commit([putRun(run)]);
+          const summary = summarizeRun(run);
+          runState.set(run.id, JSON.stringify(summary));
+          sync.commit([putRun(summary)]);
           return run;
         }),
       compact: ({ id }) =>
         promise(async () => {
           const run = await backend.compactRun(id);
-          runState.set(run.id, JSON.stringify(run));
-          sync.commit([putRun(run)]);
+          const summary = summarizeRun(run);
+          runState.set(run.id, JSON.stringify(summary));
+          sync.commit([putRun(summary)]);
           return run;
         }),
       stop: ({ id }) =>
         promise(async () => {
           const run = await backend.stopRun(id);
-          runState.set(run.id, JSON.stringify(run));
-          sync.commit([putRun(run)]);
+          const summary = summarizeRun(run);
+          runState.set(run.id, JSON.stringify(summary));
+          sync.commit([putRun(summary)]);
           return run;
         }),
-      events: ({ id, after, limit }) =>
+      events: ({ id, after, before, limit }) =>
         promise(async () =>
           backend.runEvents
-            ? backend.runEvents(id, after, limit)
+            ? backend.runEvents(id, after, limit, before)
             : {
                 events: (await backend.getRun(id)).events ?? [],
                 nextCursor: 0,
+                previousCursor: null,
                 more: false,
+                moreBefore: false,
                 reset: false,
                 completed: true,
               },
@@ -407,6 +456,18 @@ export const makeTypedApi = async (
           if (!backend.liveSessionPage)
             throw new Error("Live session paging is unavailable");
           return backend.liveSessionPage(input);
+        }),
+      trajectory: (input) =>
+        promise(() => {
+          if (!backend.liveTrajectory)
+            throw new Error("Live trajectory paging is unavailable");
+          return backend.liveTrajectory(input);
+        }),
+      trajectoryEvent: ({ id }) =>
+        promise(() => {
+          if (!backend.liveTrajectoryEvent)
+            throw new Error("Live trajectory details are unavailable");
+          return backend.liveTrajectoryEvent(id);
         }),
     },
     files: {
@@ -569,6 +630,7 @@ export const makeTypedApi = async (
 
   return {
     sync,
+    refreshRun,
     refreshRuns,
     workbench,
     syncApp: httpApp(router(SyncRpc, syncHandlers(sync))),

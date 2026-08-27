@@ -4,19 +4,20 @@ import { inMemory, router } from "@kyoot/rpc";
 import { authority } from "@kyoot/sync";
 import { handlers, SyncRpc } from "@kyoot/sync/rpc";
 import { browserStore } from "@kyoot/workbench-protocol/browser";
-import type { Run } from "@kyoot/workbench-protocol";
+import type { RunSummary } from "@kyoot/workbench-protocol";
 
 test("browser store projects every run mutation immediately and reconciles", async () => {
-  const initial: Run = {
+  const initial: RunSummary = {
     id: "r1",
     project: "kyoot",
-    prompt: "test",
+    promptPreview: "test",
     title: "Test",
     status: "completed",
     createdAt: new Date(0).toISOString(),
     updatedAt: new Date(0).toISOString(),
-    events: [],
+    toolCount: 0,
     turnCount: 1,
+    eventCursor: 0,
   };
   const releases: Array<() => void> = [];
   const releaseNext = async () => {
@@ -29,16 +30,23 @@ test("browser store projects every run mutation immediately and reconciles", asy
     initial: { runs: [initial] },
     apply: async (mutation) => {
       await new Promise<void>((resolve) => releases.push(resolve));
-      const current = server.current().collections.runs?.[0] as Run;
+      const current = server.current().collections.runs?.[0] as RunSummary;
       const status = mutation.type === "runs/stop" ? "stopped" : "queued";
       const run = {
         ...current,
         status,
         updatedAt: new Date().toISOString(),
         turnCount: mutation.type === "runs/message" ? 2 : current.turnCount,
-      } as Run;
+      } as RunSummary;
       return {
-        changes: [{ collection: "runs", operation: "put" as const, key: run.id, value: run }],
+        changes: [
+          {
+            collection: "runs",
+            operation: "put" as const,
+            key: run.id,
+            value: run,
+          },
+        ],
         result: run,
       };
     },
@@ -54,7 +62,6 @@ test("browser store projects every run mutation immediately and reconciles", asy
   const message = store.messageRun("r1", "next");
   assert.equal(store.runs.get("r1")?.status, "queued");
   assert.equal(store.runs.get("r1")?.turnCount, 2);
-  assert.equal((store.runs.get("r1")?.events?.at(-1) as any)?.text, "next");
   await releaseNext();
   await message;
 
@@ -89,7 +96,11 @@ test("browser store rolls back generated optimistic entities on rejection", asyn
     },
   });
   await store.start();
-  const pending = store.createRun({ id: "optimistic-run", project: "kyoot", prompt: "test" });
+  const pending = store.createRun({
+    id: "optimistic-run",
+    project: "kyoot",
+    prompt: "test",
+  });
   assert.equal(store.runs.get("optimistic-run")?.status, "queued");
   for (let index = 0; index < 100 && release.toString() === "() => {}"; index++)
     await new Promise((resolve) => setTimeout(resolve, 1));
@@ -231,17 +242,23 @@ test("file writes optimistically replace cached content and restore exact state"
 });
 
 test("browser store exposes collections and mutations without fetch calls", async () => {
-  const run: Run = {
+  const run: RunSummary = {
     id: "r1",
     project: "kyoot",
-    prompt: "test",
+    title: "Test",
+    promptPreview: "test",
     status: "queued",
     createdAt: new Date(0).toISOString(),
     updatedAt: new Date(0).toISOString(),
+    toolCount: 0,
+    turnCount: 1,
+    eventCursor: 0,
   };
   const server = authority({
     apply: async () => ({
-      changes: [{ collection: "runs", operation: "put", key: run.id, value: run }],
+      changes: [
+        { collection: "runs", operation: "put", key: run.id, value: run },
+      ],
     }),
   });
   const store = browserStore({
@@ -253,6 +270,6 @@ test("browser store exposes collections and mutations without fetch calls", asyn
   });
   await store.start();
   await store.createRun({ project: "kyoot", prompt: "test" });
-  assert.equal(store.runs.get("r1")?.prompt, "test");
+  assert.equal(store.runs.get("r1")?.promptPreview, "test");
   store.stop();
 });

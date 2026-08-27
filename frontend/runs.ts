@@ -3,6 +3,11 @@ export interface RunsAdapter {
   queryAll(selector: string): any[];
   all(): any[];
   refresh(): Promise<unknown>;
+  get(id: string, force?: boolean): Promise<any>;
+  events(
+    id: string,
+    input: { after?: number; before?: number | null; limit?: number },
+  ): Promise<any>;
   stop(id: string): Promise<unknown>;
   compact(id: string): Promise<unknown>;
   message(
@@ -20,7 +25,13 @@ export interface RunsAdapter {
 
 export interface RunsView {
   renderList(runs: any[], selectedId: string | null): void;
-  renderDetail(run: any, draft: string): void;
+  renderDetail(
+    run: any,
+    draft: string,
+    state?: { loading?: boolean; moreBefore?: boolean },
+  ): void;
+  appendEvents?(events: any[]): void;
+  prependEvents?(events: any[], moreBefore: boolean): void;
   showListError(error: any, hasRuns: boolean): void;
   setDraft?(draft: string): void;
   setCompactPending?(pending: boolean): void;
@@ -39,12 +50,12 @@ export function filterRuns(runs: any[], query: string) {
       (run) =>
         !normalized ||
         run.title.toLowerCase().includes(normalized) ||
-        run.prompt.toLowerCase().includes(normalized) ||
+        String(run.promptPreview || run.prompt || "")
+          .toLowerCase()
+          .includes(normalized) ||
         creatorName(run).toLowerCase().includes(normalized),
     )
-    .sort((a, b) =>
-      String(b.createdAt).localeCompare(String(a.createdAt)),
-    );
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
 export class RunsController {
@@ -52,6 +63,16 @@ export class RunsController {
   selectedId: string | null = null;
   filter = "";
   private drafts = new Map<string, string>();
+  private details = new Map<
+    string,
+    {
+      run: any;
+      previousCursor: number | null;
+      nextCursor: number;
+      moreBefore: boolean;
+    }
+  >();
+  private detailRequests = new Map<string, Promise<void>>();
 
   constructor(
     private adapter: RunsAdapter,
@@ -68,25 +89,37 @@ export class RunsController {
   }
 
   update(runs: any[]) {
+    const previous = this.runs.find((run) => run.id === this.selectedId);
     this.runs = runs;
-    this.render();
+    this.renderList();
+    const summary = runs.find((run) => run.id === this.selectedId);
+    const detail = summary ? this.details.get(summary.id) : null;
+    if (!summary || !detail) return;
+    const stateChanged =
+      previous?.status !== summary.status ||
+      previous?.toolCount !== summary.toolCount ||
+      previous?.endedAt !== summary.endedAt;
+    if (stateChanged) void this.loadDetail(summary.id, true);
+    else if ((summary.eventCursor || 0) > detail.nextCursor)
+      void this.loadNewEvents(summary.id, detail.nextCursor);
   }
 
   setFilter(value: string) {
     this.filter = value;
-    this.render();
+    this.renderList();
   }
 
   select(id: string, { render = true, push = true } = {}) {
     this.selectedId = id;
-    if (render) this.render();
-    else this.renderDetail();
+    if (render) this.renderList();
+    this.renderDetail();
+    void this.loadDetail(id);
     if (push) this.adapter.navigate(`/agents/${encodeURIComponent(id)}`);
   }
 
   clearSelection() {
     this.selectedId = null;
-    this.render();
+    this.renderList();
   }
 
   has(id: string) {
@@ -102,14 +135,97 @@ export class RunsController {
   }
 
   render() {
+    this.renderList();
+    this.renderDetail();
+  }
+
+  renderList() {
     const filtered = filterRuns(this.runs, this.filter);
     this.view.renderList(filtered, this.selectedId);
-    if (filtered.length) this.renderDetail();
   }
 
   renderDetail() {
-    const run = this.runs.find((candidate) => candidate.id === this.selectedId);
-    if (run) this.view.renderDetail(run, this.draft(run.id));
+    if (!this.selectedId) return;
+    const detail = this.details.get(this.selectedId);
+    if (detail) {
+      const summary = this.runs.find(
+        (candidate) => candidate.id === this.selectedId,
+      );
+      this.view.renderDetail(
+        { ...detail.run, ...summary, events: detail.run.events },
+        this.draft(this.selectedId),
+        { moreBefore: detail.moreBefore },
+      );
+      return;
+    }
+    const summary = this.runs.find(
+      (candidate) => candidate.id === this.selectedId,
+    );
+    if (summary)
+      this.view.renderDetail(
+        { ...summary, prompt: summary.promptPreview, events: [] },
+        this.draft(summary.id),
+        { loading: true },
+      );
+  }
+
+  async loadDetail(id: string, force = false) {
+    if (!force && this.details.has(id)) return;
+    const existing = this.detailRequests.get(id);
+    if (existing) return existing;
+    const request = (async () => {
+      try {
+        const [run, page] = await Promise.all([
+          this.adapter.get(id, force),
+          this.adapter.events(id, {
+            before: Number.MAX_SAFE_INTEGER,
+            limit: 50,
+          }),
+        ]);
+        this.details.set(id, {
+          run: { ...run, events: [...page.events] },
+          previousCursor: page.previousCursor,
+          nextCursor: page.nextCursor,
+          moreBefore: page.moreBefore,
+        });
+        if (this.selectedId === id) this.renderDetail();
+      } catch (error) {
+        this.view.showListError(error, this.runs.length > 0);
+      } finally {
+        this.detailRequests.delete(id);
+      }
+    })();
+    this.detailRequests.set(id, request);
+    return request;
+  }
+
+  async loadEarlier() {
+    if (!this.selectedId) return;
+    const detail = this.details.get(this.selectedId);
+    if (!detail?.moreBefore || detail.previousCursor == null) return;
+    const page = await this.adapter.events(this.selectedId, {
+      before: detail.previousCursor,
+      limit: 50,
+    });
+    const known = new Set(detail.run.events.map((event) => event.id));
+    const events = page.events.filter((event) => !known.has(event.id));
+    detail.run = { ...detail.run, events: [...events, ...detail.run.events] };
+    detail.previousCursor = page.previousCursor;
+    detail.moreBefore = page.moreBefore;
+    this.view.prependEvents?.(events, page.moreBefore);
+  }
+
+  private async loadNewEvents(id: string, after: number) {
+    const detail = this.details.get(id);
+    if (!detail) return;
+    const page = await this.adapter.events(id, { after, limit: 100 });
+    if (page.reset) return this.loadDetail(id, true);
+    const known = new Set(detail.run.events.map((event) => event.id));
+    const events = page.events.filter((event) => !known.has(event.id));
+    if (!events.length) return;
+    detail.run = { ...detail.run, events: [...detail.run.events, ...events] };
+    detail.nextCursor = page.nextCursor;
+    if (this.selectedId === id) this.view.appendEvents?.(events);
   }
 
   async stop(id: string) {
@@ -264,7 +380,6 @@ export function createRunsView(adapter: RunsAdapter) {
     `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>`;
   const eventHtml = (event: any) => {
     if (event.type === "tool") {
-      const args = event.args ? JSON.stringify(event.args, null, 2) : "—";
       const artifact = event.artifact;
       const name = event.name || "tool";
       let target = "";
@@ -277,13 +392,7 @@ export function createRunsView(adapter: RunsAdapter) {
       if (artifact?.count && !artifact?.diff)
         target += `<span class="toolrange">${artifact.count} replacement${artifact.count === 1 ? "" : "s"}</span>`;
       if (artifact?.kind === "diff") target += diffStats(artifact.diff);
-      const body =
-        artifact?.kind === "read"
-          ? sourceHtml(artifact.content || "", artifact.path)
-          : artifact?.kind === "diff"
-            ? diffHtml(artifact.diff || "", artifact.path)
-            : `<pre>${esc(args)}</pre>`;
-      return `<div class="event toolrow"><details class="toolevent" data-call-id="${esc(event.callId || event.id || "")}"><summary class="tool-${esc(name)}"><i>${toolIcon(name)}</i><span class="toolname">${esc(toolLabel(name))}</span>${target}</summary>${body}</details></div>`;
+      return `<div class="event toolrow" data-event-id="${esc(event.id || event.callId || "")}"><details class="toolevent" data-call-id="${esc(event.callId || event.id || "")}"><summary class="tool-${esc(name)}"><i>${toolIcon(name)}</i><span class="toolname">${esc(toolLabel(name))}</span>${target}</summary><div class="toolbody" data-state="empty"></div></details></div>`;
     }
     if (event.type === "compaction")
       return `<div class="event compactionevent"><span>Context compacted</span>${event.result?.tokensBefore ? `<small>${num(event.result.tokensBefore)} → ${num(event.result.estimatedTokensAfter || 0)} tokens</small>` : ""}</div>`;
@@ -297,6 +406,33 @@ export function createRunsView(adapter: RunsAdapter) {
   };
 
   let controller: RunsController;
+  const currentEvents = new Map<string, any>();
+  const toolBody = (event: any) => {
+    const artifact = event?.artifact;
+    if (artifact?.kind === "read")
+      return sourceHtml(artifact.content || "", artifact.path);
+    if (artifact?.kind === "diff")
+      return diffHtml(artifact.diff || "", artifact.path);
+    return `<pre>${esc(event?.args ? JSON.stringify(event.args, null, 2) : "—")}</pre>`;
+  };
+  const fillToolBody = (details: any) => {
+    if (!details?.open) return;
+    const body = details.querySelector(".toolbody");
+    if (!body || body.dataset.state === "ready") return;
+    const row = details.closest("[data-event-id]");
+    body.innerHTML = toolBody(currentEvents.get(row?.dataset.eventId));
+    body.dataset.state = "ready";
+  };
+  const detailRoot = $("#agentDetail");
+  detailRoot.addEventListener(
+    "toggle",
+    (event) => fillToolBody(event.target),
+    true,
+  );
+  detailRoot.addEventListener("click", (event) => {
+    const button = event.target.closest(".loadearlier");
+    if (button) void controller.loadEarlier();
+  });
   const view: RunsView = {
     renderList(runs, selectedId) {
       const element = $("#agentList");
@@ -305,19 +441,30 @@ export function createRunsView(adapter: RunsAdapter) {
         element.innerHTML = '<div class="agentempty">NO MATCHES</div>';
         return;
       }
-      element.innerHTML = runs
-        .map(
-          (run) =>
-            `<button class="agent ${selectedId === run.id ? "selected" : ""}" data-id="${run.id}"><span class="state ${run.status}">${esc(run.status.toUpperCase())}</span><b>${esc(run.title)}</b><small class="creatorline">${avatar(run)}<span>${esc(creatorName(run))} · ${duration(run)} · ${run.toolCount || 0} tools</span></small></button>`,
-        )
-        .join("");
-      $$(".agent").forEach(
-        (button) =>
-          (button.onclick = () => controller.select(button.dataset.id)),
-      );
+      element.querySelector(".agentempty")?.remove();
+      const present = new Set(runs.map((run) => String(run.id)));
+      for (const stale of element.querySelectorAll(".agent"))
+        if (!present.has(stale.dataset.id)) stale.remove();
+      for (const run of runs) {
+        let button = element.querySelector(
+          `.agent[data-id="${CSS.escape(String(run.id))}"]`,
+        );
+        if (!button) {
+          button = document.createElement("button");
+          button.className = "agent";
+          button.dataset.id = run.id;
+        }
+        const content = `<span class="state ${run.status}">${esc(run.status.toUpperCase())}</span><b>${esc(run.title)}</b><small class="creatorline">${avatar(run)}<span>${esc(creatorName(run))} · ${duration(run)} · ${run.toolCount || 0} tools</span></small>`;
+        if (button.dataset.content !== content) {
+          button.innerHTML = content;
+          button.dataset.content = content;
+        }
+        button.classList.toggle("selected", selectedId === run.id);
+        element.appendChild(button);
+      }
       element.scrollTop = listScroll;
     },
-    renderDetail(run, draft) {
+    renderDetail(run, draft, state = {}) {
       const oldTranscript = $(".agenttranscript");
       const oldScroll = oldTranscript?.scrollTop || 0;
       const nearBottom = oldTranscript
@@ -333,11 +480,16 @@ export function createRunsView(adapter: RunsAdapter) {
           .filter(Boolean),
       );
       const usage = run.usage || {};
+      currentEvents.clear();
+      for (const event of run.events || [])
+        currentEvents.set(String(event.id || event.callId || ""), event);
       const timeline = (run.events || []).length
         ? (run.events || []).map(eventHtml).join("")
-        : `<div class="event"><div class="eventlabel">LOG</div><pre class="legacylog">${esc(run.output || "—")}</pre></div>`;
+        : state.loading
+          ? '<div class="event agentloading">Loading recent events…</div>'
+          : `<div class="event"><div class="eventlabel">LOG</div><pre class="legacylog">${esc(run.output || "—")}</pre></div>`;
       $("#agentDetail").innerHTML =
-        `<div class="agenttranscript"><div class="taskhead"><div class="taskcreator">${avatar(run, "large")}<span><small>CREATED BY</small><b>${esc(creatorName(run))}</b></span></div><h1>${esc(run.title)}</h1><div class="tasksub"><span class="statuspill ${run.status}">${esc(run.status.toUpperCase())}</span><span>bashtv/free</span><span>${duration(run)}</span>${run.status === "running" ? `<button class="stopagent" onclick="stopAgent('${run.id}')">STOP</button>` : ""}</div></div><div class="promptblock">${avatar(run, "prompt")}<div>${esc(run.prompt)}</div></div><div class="timeline">${timeline}</div></div><form class="followupcomposer ${run.status === "running" || run.status === "compacting" ? "working" : ""}" data-run-id="${run.id}"><textarea id="followupPrompt" rows="3" maxlength="20000" placeholder="${run.status === "compacting" ? "Compacting context…" : run.status === "running" ? "Agent is working…" : "Message agent"}" ${run.status === "running" || run.status === "compacting" ? "disabled" : ""}>${esc(draft)}</textarea><div class="composerbar"><div class="composerinfo"><span class="modelstar" aria-hidden="true"></span><span>bashtv/free</span><span class="thinkingmark" aria-hidden="true"></span><span>low</span><span class="contextring" style="--context:${Math.min(100, Math.round((usage.totalTokens || 0) / 2560))}%" title="${num(usage.totalTokens || 0)} / 256K tokens · ${Math.min(100, Math.round((usage.totalTokens || 0) / 2560))}% context" aria-label="${Math.min(100, Math.round((usage.totalTokens || 0) / 2560))}% context"></span><span class="contextpercent">${Math.min(100, Math.round((usage.totalTokens || 0) / 2560))}%</span><button type="button" class="compactrun" ${run.status === "running" || run.status === "compacting" ? "disabled" : ""}>Compact</button></div>${run.status === "running" ? `<button type="button" class="stopfollow" aria-label="Stop agent"><span></span></button>` : `<button type="submit" class="sendfollow" aria-label="Send message" ${run.status === "compacting" ? "disabled" : ""}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4"/></svg></button>`}</div></form>`;
+        `<div class="agenttranscript"><div class="taskhead"><div class="taskcreator">${avatar(run, "large")}<span><small>CREATED BY</small><b>${esc(creatorName(run))}</b></span></div><h1>${esc(run.title)}</h1><div class="tasksub"><span class="statuspill ${run.status}">${esc(run.status.toUpperCase())}</span><span>bashtv/free</span><span>${duration(run)}</span>${run.status === "running" ? `<button class="stopagent" onclick="stopAgent('${run.id}')">STOP</button>` : ""}</div></div><div class="promptblock">${avatar(run, "prompt")}<div>${esc(run.prompt || run.promptPreview || "")}</div></div><div class="timeline">${state.moreBefore ? '<button class="loadearlier" type="button">Load 50 earlier events</button>' : ""}${timeline}</div></div><form class="followupcomposer ${run.status === "running" || run.status === "compacting" ? "working" : ""}" data-run-id="${run.id}"><textarea id="followupPrompt" rows="3" maxlength="20000" placeholder="${run.status === "compacting" ? "Compacting context…" : run.status === "running" ? "Agent is working…" : "Message agent"}" ${run.status === "running" || run.status === "compacting" ? "disabled" : ""}>${esc(draft)}</textarea><div class="composerbar"><div class="composerinfo"><span class="modelstar" aria-hidden="true"></span><span>bashtv/free</span><span class="thinkingmark" aria-hidden="true"></span><span>low</span><span class="contextring" style="--context:${Math.min(100, Math.round((usage.totalTokens || 0) / 2560))}%" title="${num(usage.totalTokens || 0)} / 256K tokens · ${Math.min(100, Math.round((usage.totalTokens || 0) / 2560))}% context" aria-label="${Math.min(100, Math.round((usage.totalTokens || 0) / 2560))}% context"></span><span class="contextpercent">${Math.min(100, Math.round((usage.totalTokens || 0) / 2560))}%</span><button type="button" class="compactrun" ${run.status === "running" || run.status === "compacting" ? "disabled" : ""}>Compact</button></div>${run.status === "running" ? `<button type="button" class="stopfollow" aria-label="Stop agent"><span></span></button>` : `<button type="submit" class="sendfollow" aria-label="Send message" ${run.status === "compacting" ? "disabled" : ""}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4"/></svg></button>`}</div></form>`;
       const followup = $("#followupPrompt");
       followup?.addEventListener("input", () =>
         controller.setDraft(run.id, followup.value),
@@ -367,14 +519,20 @@ export function createRunsView(adapter: RunsAdapter) {
         if (hadFocus) followup?.focus();
       });
       $$("#agentDetail .toolevent").forEach((element) => {
-        if (openTools.has(element.dataset.callId)) element.open = true;
+        if (openTools.has(element.dataset.callId)) {
+          element.open = true;
+          fillToolBody(element);
+        }
       });
       $("#agentMeta").innerHTML = [
         ["CREATOR", creatorName(run)],
         ...(run.originChat?.title ? [["CHAT", run.originChat.title]] : []),
         ["RUN", run.id.slice(0, 8)],
         ["CWD", run.cwd],
-        ["STARTED", new Date(run.startedAt).toLocaleString()],
+        [
+          "STARTED",
+          run.startedAt ? new Date(run.startedAt).toLocaleString() : "—",
+        ],
         ["DURATION", duration(run)],
         ["TOOLS", run.toolCount || 0],
         ["TOKENS", usage.totalTokens || "—"],
@@ -393,6 +551,32 @@ export function createRunsView(adapter: RunsAdapter) {
             )
             .join("")
         : '<div class="metarow"><span>NONE</span></div>';
+    },
+    appendEvents(events) {
+      const timeline = $("#agentDetail .timeline");
+      if (!timeline || !events.length) return;
+      const placeholder = timeline.querySelector(".agentloading");
+      placeholder?.remove();
+      for (const event of events)
+        currentEvents.set(String(event.id || event.callId || ""), event);
+      timeline.insertAdjacentHTML("beforeend", events.map(eventHtml).join(""));
+    },
+    prependEvents(events, moreBefore) {
+      const timeline = $("#agentDetail .timeline");
+      if (!timeline) return;
+      const transcript = $(".agenttranscript");
+      const beforeHeight = transcript?.scrollHeight || 0;
+      for (const event of events)
+        currentEvents.set(String(event.id || event.callId || ""), event);
+      timeline.querySelector(".loadearlier")?.remove();
+      timeline.insertAdjacentHTML(
+        "afterbegin",
+        `${moreBefore ? '<button class="loadearlier" type="button">Load 50 earlier events</button>' : ""}${events.map(eventHtml).join("")}`,
+      );
+      if (transcript)
+        requestAnimationFrame(() => {
+          transcript.scrollTop += transcript.scrollHeight - beforeHeight;
+        });
     },
     showListError(error, hasRuns) {
       if (!hasRuns)
@@ -424,6 +608,10 @@ export function createRunsView(adapter: RunsAdapter) {
     },
   };
   controller = new RunsController(adapter, view);
+  $("#agentList").addEventListener("click", (event) => {
+    const button = (event.target as Element).closest<HTMLElement>(".agent");
+    if (button?.dataset.id) controller.select(button.dataset.id);
+  });
   (window as any).stopAgent = (id: string) => controller.stop(id);
   $("#agentSearch").oninput = (event) =>
     controller.setFilter((event.target as HTMLInputElement).value);

@@ -20,3 +20,25 @@ Measured 2026-08-27 from the generated production assets.
 - The service worker obtains its shell-only precache list from the generated manifest. It never handles `/api/` requests or non-shell resources and therefore does not cache credentials, project data, artifacts, command output, or lazy editor/Markdown/workflow assets.
 
 A full cold-browser timing baseline was not stable under the experimental WebMCP Chrome bridge; byte, dependency, manifest integrity, and HTTP cache-policy acceptance are deterministic and covered by the generated build and tests.
+
+## Data and rendering
+
+The browser data path now has explicit size limits:
+
+- The sync collection contains `RunSummary` records. Prompts, output, changes,
+  usage, and transcript events are not replicated with the run list.
+- A selected run loads its metadata and newest 50 events in parallel. Earlier
+  events load in 50-event pages. New events append to the current transcript.
+- Closed tool rows contain only their summary. Source highlighting, diff
+  formatting, and argument formatting run when the user opens that row.
+- Live Trajectory returns at most 100 summary rows to the UI. Full arguments,
+  text, result details, and usage load for one selected event.
+- The Live Trajectory index processes only new session rows. Search and page
+  requests reuse the derived index.
+- Routes register before sync hydration. Live Chat and the Files tree load only
+  when their route needs them.
+- JSON RPC and sync responses use gzip when the client accepts it.
+
+Focused tests enforce a run-summary size below 1 KB for a run with a large
+prompt and transcript. Trajectory tests verify that summary pages exclude event
+bodies and remain small while details stay available through the event query.

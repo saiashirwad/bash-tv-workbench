@@ -2,7 +2,24 @@
 // initial Files/application download.
 type EditorModule = typeof import("../editor-entry.ts");
 let editorModule: EditorModule | null = null;
+let editorModulePromise: Promise<EditorModule> | null = null;
 const dynamicImport = (url: string): Promise<any> => import(url);
+const loadEditorModule = () => {
+  editorModulePromise ??= dynamicImport("/editor.js")
+    .then((module) => (editorModule = module as EditorModule))
+    .catch((error) => {
+      editorModulePromise = null;
+      throw error;
+    });
+  return editorModulePromise;
+};
+export const preloadFilesEditor = async () => {
+  try {
+    await loadEditorModule();
+  } catch {
+    // A later file open retries and reports a visible error if it also fails.
+  }
+};
 export const filesEditorText = () => editorModule?.editorText() ?? "";
 export async function openFilesEditor(
   element: HTMLElement,
@@ -10,8 +27,8 @@ export async function openFilesEditor(
   path: string,
   changed: (text: string) => void,
 ) {
-  editorModule ??= (await dynamicImport("/editor.js")) as EditorModule;
-  await editorModule.openEditor(element, content, path, changed);
+  const module = await loadEditorModule();
+  await module.openEditor(element, content, path, changed);
 }
 
 export interface FileProject {
@@ -75,7 +92,7 @@ export interface FilesView {
     text: string,
     canSave: boolean,
   ): void;
-  selectPath(path: string): void;
+  selectPath(path: string | null): void;
   closeProjectMenu(): void;
 }
 
@@ -254,6 +271,7 @@ export class FilesController implements FilesQuickOpenController {
     this.openVersion = null;
     this.savedText = "";
     this.dirty = false;
+    this.view.selectPath(null);
     this.view.renderBreadcrumbs(this.project, null);
     this.setSaveState("", "");
     this.renderTree();
@@ -373,6 +391,7 @@ export function createFilesDomView(options: {
   const $$ = options.queryAll;
   const esc = options.escape;
   let controller: FilesController;
+  let selectedPath: string | null = null;
 
   const treeIcon = (node: FileNode, expanded: ReadonlySet<string>) => {
     if (node.type === "dir")
@@ -435,6 +454,10 @@ export function createFilesDomView(options: {
         button.onpointerleave = () => controller.cancelPrefetch();
         button.onfocus = () => controller.prefetch(button.dataset.path);
       });
+      if (selectedPath)
+        $(`.node[data-path="${CSS.escape(selectedPath)}"]`)?.classList.add(
+          "selected",
+        );
     },
     renderBreadcrumbs(project, path) {
       if (!path) {
@@ -459,19 +482,20 @@ export function createFilesDomView(options: {
       const raw = options.rawUrl(project, path);
       $("#raw").href = raw;
       $("#raw").classList.remove("hidden");
-      $("#media").innerHTML = "";
-      $("#editor").classList.add("hidden");
     },
     showMedia(project, path, mime) {
       const raw = options.rawUrl(project, path);
+      $("#editor").classList.add("hidden");
       $("#media").innerHTML = mime.startsWith("image/")
         ? `<img src="${raw}" alt="${esc(path)}">`
         : `<iframe src="${raw}" style="width:100%;height:78vh"></iframe>`;
     },
     showEditor() {
+      $("#media").innerHTML = "";
       $("#editor").classList.remove("hidden");
     },
     showOpenError(message) {
+      $("#editor").classList.add("hidden");
       $("#media").innerHTML = `<pre>${esc(message)}</pre>`;
     },
     setSaveState(state, text, canSave) {
@@ -481,11 +505,15 @@ export function createFilesDomView(options: {
       $("#saveFile").classList.toggle("hidden", !controller.openPath);
     },
     selectPath(path) {
-      $$(".node").forEach((node) =>
-        node.classList.toggle("selected", node.dataset.path === path),
-      );
+      if (selectedPath)
+        $(`.node[data-path="${CSS.escape(selectedPath)}"]`)?.classList.remove(
+          "selected",
+        );
+      selectedPath = path;
+      if (!path) return;
       const button = $(`.node[data-path="${CSS.escape(path)}"]`);
-      button?.scrollIntoView({ block: "center" });
+      button?.classList.add("selected");
+      button?.scrollIntoView({ block: "nearest" });
     },
     closeProjectMenu() {
       $("#projectMenu").classList.add("hidden");

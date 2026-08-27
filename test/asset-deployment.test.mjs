@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import test from "node:test";
 
@@ -52,6 +52,13 @@ test("asset manifest maps deterministic JS entries and shell excludes private ro
   }
 });
 
+test("editor languages are split from the initial editor module", async () => {
+  const editor = await stat(new URL("public/editor.js", root));
+  const chunks = await readdir(new URL("public/chunks", root));
+  assert.ok(editor.size < 150_000, `editor entry is ${editor.size} bytes`);
+  assert.ok(chunks.some((name) => /^editor-.+-[A-Z0-9]{8}\.js$/.test(name)));
+});
+
 test("HTTP cache policy distinguishes HTML, hashed, compatibility, and API responses", async () => {
   await withServer(async (base) => {
     const html = await fetch(`${base}/`);
@@ -68,6 +75,16 @@ test("HTTP cache policy distinguishes HTML, hashed, compatibility, and API respo
     assert.deepEqual(
       Buffer.from(await logical.arrayBuffer()),
       Buffer.from(await hashed.arrayBuffer()),
+    );
+
+    const editorChunk = (await readdir(new URL("public/chunks", root))).find(
+      (name) => /^editor-.+-[A-Z0-9]{8}\.js$/.test(name),
+    );
+    assert.ok(editorChunk);
+    const chunk = await fetch(`${base}/chunks/${editorChunk}`);
+    assert.equal(
+      chunk.headers.get("cache-control"),
+      "public, max-age=31536000, immutable",
     );
 
     const api = await fetch(`${base}/api/health`);

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   FilesController,
   ancestors,
+  createFilesDomView,
   fileRoute,
   visibleTree,
 } from "../public/files.js";
@@ -121,6 +122,40 @@ test("stale tree and file loads cannot replace the active project or file", asyn
   assert.equal(await newOpen, true);
   firstFile.resolve({ content: "old", mime: "text/plain", editable: true });
   assert.equal(await oldOpen, false);
+});
+
+test("starting a file switch keeps the current preview visible", () => {
+  const classes = () => {
+    const values = new Set();
+    return {
+      values,
+      add: (...names) => names.forEach((name) => values.add(name)),
+      remove: (...names) => names.forEach((name) => values.delete(name)),
+      toggle: (name, force) =>
+        force === false ? values.delete(name) : values.add(name),
+    };
+  };
+  const elements = {
+    "#raw": { href: "", classList: classes() },
+    "#media": { innerHTML: "current preview" },
+    "#editor": { classList: classes() },
+  };
+  const view = createFilesDomView({
+    query: (selector) => elements[selector],
+    queryAll: () => [],
+    escape: String,
+    rawUrl: (_project, path) => `/raw/${path}`,
+  });
+
+  view.beginOpen("app", "next.ts");
+  assert.equal(elements["#editor"].classList.values.has("hidden"), false);
+  assert.equal(elements["#media"].innerHTML, "current preview");
+
+  view.showMedia("app", "image.png", "image/png");
+  assert.equal(elements["#editor"].classList.values.has("hidden"), true);
+  view.showEditor(true);
+  assert.equal(elements["#editor"].classList.values.has("hidden"), false);
+  assert.equal(elements["#media"].innerHTML, "");
 });
 
 test("save conflicts preserve dirty editor state and expected revision", async () => {

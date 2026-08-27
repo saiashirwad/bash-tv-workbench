@@ -14,14 +14,14 @@
     "orchestrator-kyoot"
   ],
   "scripts": {
-    "build:editor": "esbuild editor-entry.ts --bundle --format=esm --target=es2022 --minify --outfile=public/editor.js",
+    "build:editor": "node scripts/build-editor.mjs",
     "build:markdown": "esbuild markdown-entry.ts --bundle --format=esm --target=es2022 --minify --outfile=public/markdown.js",
     "build:frontend": "esbuild frontend/app.ts frontend/auth.ts frontend/dom.ts frontend/files.ts frontend/git.ts frontend/live-chat.ts frontend/runs.ts frontend/trajectory.ts frontend/workflows.ts frontend/webmcp.ts --bundle --splitting --format=esm --platform=browser --target=es2022 '--external:/*.js' '--external:/*.mjs' --outdir=public --entry-names=[name] --chunk-names=chunks/[name]-[hash] && esbuild frontend/sw.ts --bundle --format=iife --platform=browser --target=es2022 --outfile=public/sw.js",
     "build:sync": "esbuild kyoot/packages/workbench-protocol/src/browser.ts --bundle --platform=browser --format=esm --target=es2022 --minify --outfile=public/workbench-store.js && esbuild typed-backend.ts --bundle --platform=node --format=esm --target=node20 --external:/opt/pi-mono/* --outfile=typed-server.mjs",
     "build": "npm run build:editor && npm run build:markdown && npm run build:sync && npm run build:frontend && node scripts/generate-asset-manifest.mjs",
     "typecheck:frontend": "tsc -p tsconfig.frontend.json && tsc -p tsconfig.frontend-worker.json",
     "format": "prettier --write \"*.{js,mjs,ts,json}\" \"frontend/*.{ts,d.ts}\" \"public/index.html\" \"public/*.css\"",
-    "check:syntax": "node --check scripts/generate-asset-manifest.mjs && node --check server.mjs && node --check live-trajectory.mjs && node --check bin/bash-workbench.mjs && node --check workbench-auth.mjs && node --check workbench-platform.mjs && node --check project-config.mjs && node --check child-provider.mjs && node --check public/app.js && node --check public/dom.js && node --check public/files.js && node --check public/git.js && node --check public/live-chat.js && node --check public/runs.js && node --check public/trajectory.js && node --check public/workflows.js && node --check public/webmcp.js && node --check public/sw.js",
+    "check:syntax": "node --check scripts/build-editor.mjs && node --check scripts/generate-asset-manifest.mjs && node --check server.mjs && node --check live-trajectory.mjs && node --check bin/bash-workbench.mjs && node --check workbench-auth.mjs && node --check workbench-platform.mjs && node --check project-config.mjs && node --check child-provider.mjs && node --check public/app.js && node --check public/dom.js && node --check public/files.js && node --check public/git.js && node --check public/live-chat.js && node --check public/runs.js && node --check public/trajectory.js && node --check public/workflows.js && node --check public/webmcp.js && node --check public/sw.js",
     "check:portable": "node scripts/check-standalone.mjs",
     "check:generated": "node scripts/check-generated.mjs",
     "check:typed-pages": "node scripts/check-typed-pages.mjs",

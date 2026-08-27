@@ -940,7 +940,8 @@ const server = http.createServer(async (req, res) => {
     const publicPath = `/${path.relative(PUBLIC, file).split(path.sep).join("/")}`;
     const cacheControl = file.endsWith("index.html")
       ? "no-cache"
-      : hashedAssets.has(u.pathname)
+      : hashedAssets.has(u.pathname) ||
+          /^\/chunks\/editor-.+-[A-Z0-9]{8}\.js$/.test(publicPath)
         ? "public, max-age=31536000, immutable"
         : "public, max-age=300";
     res.writeHead(200, {

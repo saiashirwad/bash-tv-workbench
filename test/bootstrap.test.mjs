@@ -34,6 +34,8 @@ test("one-paste setup clones GitHub and keeps open experimental access", async (
   assert.match(prompt, /Do not set `BASH_WORKBENCH_AUTH_REQUIRED`/);
   assert.match(prompt, /\$HOME\/\.local\/bin\/bw status --wait/);
   assert.doesNotMatch(prompt, /until .*grep/);
+  assert.match(prompt, /If a required command fails, stop/);
+  assert.match(prompt, /Use `runs batch` for independent parallel tasks/);
 });
 
 test("space installation uses committed deployment assets", async () => {

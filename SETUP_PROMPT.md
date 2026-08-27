@@ -33,7 +33,11 @@ Use `/home/bashtv/workbench` as the destination. Do only the steps below. Do not
 
    your workbench is running!
 
+If a required command fails, stop and give one short error. Do not continue to the next step.
+
 Do not use browser automation. Do not click through the Workbench. Do not test files or downloads. Do not run `verify`, `verify --live`, an agent probe, port surveys, process checks, supervisor checks, or other acceptance tests.
+
+For later Workbench tasks, use `$HOME/.local/bin/bw` instead of custom HTTP requests or scripts. Use `runs batch` for independent parallel tasks, and use `runs list`, `runs get`, or `runs wait` to check their status. Use workflows only when tasks have dependencies.
 
 Never inspect, print, copy, or save Bash.tv credentials or entitlement values. Do not modify Bash.tv platform services or internal files. Leave ports `7890`, `8012`, and `8020` unchanged.
 ````

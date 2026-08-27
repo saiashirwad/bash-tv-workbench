@@ -106,7 +106,8 @@ const synthwaveHighlight = HighlightStyle.define([
 ]);
 const languageSlot = new Compartment();
 let view: EditorView | null = null,
-  onChange: (text: string) => void = () => {};
+  onChange: (text: string) => void = () => {},
+  languageRequest = 0;
 function languageFor(filename) {
   const ext = (filename.toLowerCase().match(/\.([^.\/]+)$/) || [])[1] || "";
   return (
@@ -129,7 +130,7 @@ export async function openEditor(
   changed?: (text: string) => void,
 ) {
   onChange = changed || (() => {});
-  const lang = await loadLanguage(filename);
+  const request = ++languageRequest;
   if (!view)
     view = new EditorView({
       parent,
@@ -139,7 +140,7 @@ export async function openEditor(
           basicSetup,
           githubDark,
           syntaxHighlighting(synthwaveHighlight),
-          languageSlot.of(lang),
+          languageSlot.of([]),
           keymap.of([indentWithTab]),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) onChange(u.state.doc.toString());
@@ -150,9 +151,13 @@ export async function openEditor(
   else
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: content },
-      effects: languageSlot.reconfigure(lang),
+      effects: languageSlot.reconfigure([]),
     });
   view.focus();
+  void loadLanguage(filename).then((language) => {
+    if (view && request === languageRequest)
+      view.dispatch({ effects: languageSlot.reconfigure(language) });
+  });
   return view;
 }
 export function editorText() {

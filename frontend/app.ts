@@ -33,6 +33,7 @@ import {
   fileRoute,
   filesEditorText,
   openFilesEditor,
+  preloadFilesEditor,
 } from "/files.js";
 // @ts-expect-error vendored Page.js runtime
 import page from "/page.mjs";
@@ -949,11 +950,13 @@ function registerRoutes() {
     );
   });
   page("/files/:project", async (context) => {
+    void preloadFilesEditor();
     if (!(await routeProject(context.params.project))) return;
     showPage("files");
     filesController.routeRoot();
   });
   page("/files/:project/:path(.*)", async (context) => {
+    void preloadFilesEditor();
     if (!(await routeProject(context.params.project))) return;
     showPage("files");
     await filesController.routeFile(context.params.path);

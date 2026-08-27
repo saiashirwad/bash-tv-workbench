@@ -11,12 +11,64 @@ COMMAND="${1:-plan}"
 LIVE="${2:-}"
 MISE="$(command -v mise 2>/dev/null || true)"
 [[ -n "$MISE" ]] || MISE="$HOME/.local/bin/mise"
+MISE_VERSION="2026.8.14"
 
 cd "$ROOT"
 
 ok() { printf '[ok] %s\n' "$*"; }
 info() { printf '[info] %s\n' "$*"; }
 fail() { printf '[fail] %s\n' "$*" >&2; exit 1; }
+
+verify_sha256() {
+  local file="$1" expected="$2" actual
+  if command -v sha256sum >/dev/null 2>&1; then
+    printf '%s  %s\n' "$expected" "$file" | sha256sum --check --status
+    return
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    actual="$(shasum -a 256 "$file" | awk '{print $1}')"
+    [[ "$actual" == "$expected" ]]
+    return
+  fi
+  fail "sha256sum or shasum is required to verify the mise download"
+}
+
+ensure_mise() {
+  [[ -x "$MISE" ]] && return
+  command -v curl >/dev/null 2>&1 || fail "curl is required to install mise"
+  command -v mktemp >/dev/null 2>&1 || fail "mktemp is required to install mise"
+
+  local platform asset checksum url download
+  platform="$(uname -s):$(uname -m)"
+  case "$platform" in
+    Linux:x86_64 | Linux:amd64)
+      asset="mise-v${MISE_VERSION}-linux-x64"
+      checksum="7cd12d6002d5b3c83a89cad79023712faf2a36f9e8b2ee2061dac5135b3de0ed"
+      ;;
+    Linux:aarch64 | Linux:arm64)
+      asset="mise-v${MISE_VERSION}-linux-arm64"
+      checksum="bc2c447a7e498b0bed0a421cc2101b407fef09a3195670d35a4aa3f43cd868a1"
+      ;;
+    *) fail "automatic mise installation does not support $platform" ;;
+  esac
+
+  url="https://github.com/jdx/mise/releases/download/v${MISE_VERSION}/${asset}"
+  download="$(mktemp "${TMPDIR:-/tmp}/kyoot-workbench-mise.XXXXXX")"
+  info "Installing pinned mise v${MISE_VERSION} for $platform"
+  if ! curl --fail --location --silent --show-error --retry 3 --connect-timeout 15 \
+    --output "$download" "$url"; then
+    rm -f "$download"
+    fail "mise download failed"
+  fi
+  if ! verify_sha256 "$download" "$checksum"; then
+    rm -f "$download"
+    fail "mise download checksum did not match"
+  fi
+  mkdir -p "$(dirname "$MISE")"
+  chmod 0755 "$download"
+  mv "$download" "$MISE"
+  ok "mise installed: $MISE"
+}
 
 have_node_24() {
   "$MISE" exec -- node -e 'if (Number(process.versions.node.split(".")[0]) < 24) process.exit(1)'
@@ -25,7 +77,8 @@ have_node_24() {
 doctor() {
   [[ -f /opt/pi-mono/packages/coding-agent/dist/cli.js ]] || fail "Bash.tv Pi runtime is missing"
   ok "Bash.tv Pi runtime found"
-  [[ -x "$MISE" ]] || fail "mise is required (checked PATH and $HOME/.local/bin/mise)"
+  ensure_mise
+  [[ -x "$MISE" ]] || fail "mise installation did not create $MISE"
   ok "mise found: $MISE"
   [[ -f mise.toml ]] || fail "mise.toml is missing"
   "$MISE" install
@@ -35,7 +88,7 @@ doctor() {
   [[ -f orchestrator-kyoot/src/run-engine.ts ]] || fail "orchestrator source is incomplete"
   [[ -f typed-server.mjs && -f public/workbench-store.js ]] || fail "generated runtime assets are missing"
   ok "vendored source and generated runtime assets found"
-  node scripts/check-standalone.mjs
+  "$MISE" exec -- node scripts/check-standalone.mjs
   ok "repository root: $ROOT"
   info "Pi authorization must be inherited from this active Bash.tv agent session and is never persisted."
 }

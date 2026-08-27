@@ -25,14 +25,14 @@ Use /home/bashtv/workbench as the destination.
    bash ./bootstrap.sh verify
    ```
 
-   Stop and report a failed prerequisite. Do not work around a missing Bash.tv Pi runtime.
+   `doctor` installs the pinned `mise` binary into `$HOME/.local/bin/mise` when it is missing. It verifies the official release checksum, then uses `mise.toml` to install Node `24.19.0` and npm. Do not use a piped remote installer. Stop and report any failed prerequisite. Do not work around a missing Bash.tv Pi runtime.
 6. Start the production Workbench from this active Bash.tv agent session with the coding tool's detached or tmux job mode:
 
    ```bash
    bash ./bootstrap.sh serve
    ```
 
-   Do not use `&`, `nohup`, or a credential-isolated systemd service. The server must bind to `0.0.0.0:8010` unless port `8010` is already used by an unrelated process. Inspect an existing listener before you replace it.
+   Do not use `&`, `nohup`, or a credential-isolated systemd service. The server must bind to `0.0.0.0:8010` unless port `8010` is already used by an unrelated process. Inspect an existing listener before you replace it. Start with the default experimental open-access mode because secure secret configuration is not available yet. Do not set `BASH_WORKBENCH_AUTH_REQUIRED`.
 7. Open the preview for port `8010`. Confirm all of these items:
    - Health reports mode `kyoot`.
    - The project list contains `Kyoot Workbench` and points to `/home/bashtv/workbench`.

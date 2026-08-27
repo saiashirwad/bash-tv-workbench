@@ -5,7 +5,7 @@ This repository is the complete deployable Kyoot Workbench. It includes the appl
 ## Setup contract
 
 - Read `SETUP_PROMPT.md` and use `./bootstrap.sh doctor|plan|install|verify|serve`.
-- Use the pinned Node `24.19.0` toolchain through `mise` and the single root npm workspace for installation and task orchestration.
+- Use the pinned Node `24.19.0` toolchain through `mise` and the single root npm workspace for installation and task orchestration. When `mise` is absent, `bootstrap.sh doctor` installs the pinned checksummed Linux binary into `$HOME/.local/bin/mise`.
 - Generated `typed-server.mjs` remains compatible with Node 20 and runs with `/usr/bin/node`.
 - Start the production server from the active Bash.tv agent environment using a detached/tmux coding-tool job. Do not daemonize inside `bootstrap.sh`.
 - The normal production port is `8010`; leave `8012`, `8020`, and internal platform port `7890` untouched.

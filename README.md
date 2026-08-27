@@ -16,7 +16,7 @@ No sibling Kyoot checkout is required. The orchestrator was folded into this sta
 
 ## Deploy to a new Bash space
 
-This repository is the deployment artifact. Copy or extract it into the destination space, give the destination coding agent the prompt in [`SETUP_PROMPT.md`](SETUP_PROMPT.md), and let that agent perform the acceptance checks.
+Give the destination coding agent the one-paste prompt in [`SETUP_PROMPT.md`](SETUP_PROMPT.md). The prompt clones the latest `main` branch from `https://github.com/saiashirwad/bash-tv-workbench.git`, or safely fast-forwards an existing clean checkout, then performs the complete setup and acceptance checks.
 
 The agent-facing lifecycle is:
 
@@ -30,7 +30,7 @@ bash ./bootstrap.sh serve
 bash ./bootstrap.sh verify --live
 ```
 
-`./scripts/setup-space.sh` remains a short alias for `bash ./bootstrap.sh install`. When the artifact was extracted from a Source ZIP rather than cloned, installation initializes an in-place local Git repository with no remote so Source ZIP and Git bundle downloads remain available.
+`doctor` installs pinned `mise v2026.8.14` into `$HOME/.local/bin/mise` when it is absent, verifies the official binary checksum, and installs Node `24.19.0` from `mise.toml`. `./scripts/setup-space.sh` remains a short alias for `bash ./bootstrap.sh install`. When the artifact was extracted from a Source ZIP rather than cloned, installation initializes an in-place local Git repository with no remote so Source ZIP and Git bundle downloads remain available.
 
 `serve` deliberately runs in the foreground. The destination agent must start it with its coding tool's detached/tmux mode so the durable process inherits current Bash.tv authorization in memory. Do not use `&`, `nohup`, or a clean systemd service for the authorized runtime.
 
@@ -61,7 +61,7 @@ To restore the protected owner/collaborator boundary, start with `BASH_WORKBENCH
 ## Bootstrap commands
 
 ```bash
-bash ./bootstrap.sh doctor          # verify Bash.tv Pi, mise, toolchain, and repository completeness
+bash ./bootstrap.sh doctor          # verify Bash.tv Pi; install mise and Node if needed; check repository completeness
 bash ./bootstrap.sh plan            # print exact paths, port, concurrency, and state location
 bash ./bootstrap.sh install         # install in place, build, check, and provision private state
 bash ./bootstrap.sh serve           # foreground production runtime for a detached/tmux agent job

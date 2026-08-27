@@ -1,0 +1,150 @@
+/* Expanded file tools: source first, chrome last. */
+.toolevent > .toolcode {
+  margin: 10px 0 5px 25px;
+  width: calc(100% - 25px);
+  max-height: 430px;
+  overflow: auto;
+  border: 0;
+  border-radius: 8px;
+  background: #111214;
+  scrollbar-color: #55565a #202124;
+  scrollbar-width: thin;
+}
+.toolcode::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.toolcode::-webkit-scrollbar-track {
+  background: #202124;
+}
+.toolcode::-webkit-scrollbar-thumb {
+  background: #55565a;
+  border: 2px solid #202124;
+  border-radius: 7px;
+}
+.toolcode pre {
+  display: table;
+  min-width: 100%;
+  margin: 0;
+  padding: 11px 0 13px;
+  border: 0 !important;
+  background: #111214 !important;
+  white-space: pre;
+  overflow: visible;
+  color: #c9c9cd;
+  font:
+    13px/1.55 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+}
+.toolcode .codeline {
+  display: table-row;
+  height: 20px;
+}
+.toolcode .lineno,
+.toolcode code {
+  display: table-cell;
+}
+.toolcode .lineno {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 49px;
+  padding: 0 12px 0 10px;
+  background: #111214;
+  color: #6f7075;
+  text-align: right;
+  user-select: none;
+}
+.toolcode code {
+  width: 100%;
+  padding: 0 18px 0 0;
+  background: transparent !important;
+  color: #c9c9cd;
+  white-space: pre;
+}
+.toolcode .hljs-keyword,
+.toolcode .hljs-selector-tag,
+.toolcode .hljs-literal,
+.toolcode .hljs-doctag {
+  color: #ff7b72;
+}
+.toolcode .hljs-string,
+.toolcode .hljs-regexp,
+.toolcode .hljs-attribute {
+  color: #a5d6ff;
+}
+.toolcode .hljs-number,
+.toolcode .hljs-built_in,
+.toolcode .hljs-type {
+  color: #ffa657;
+}
+.toolcode .hljs-title,
+.toolcode .hljs-title.function_,
+.toolcode .hljs-section {
+  color: #d2a8ff;
+}
+.toolcode .hljs-variable,
+.toolcode .hljs-template-variable,
+.toolcode .hljs-property,
+.toolcode .hljs-params {
+  color: #79c0ff;
+}
+.toolcode .hljs-comment,
+.toolcode .hljs-quote {
+  color: #77787e;
+  font-style: italic;
+}
+.toolcode .hljs-meta,
+.toolcode .hljs-symbol {
+  color: #7ee787;
+}
+.diffcode .codeline.add .lineno,
+.diffcode .codeline.add code {
+  background: #12331d !important;
+}
+.diffcode .codeline.del .lineno,
+.diffcode .codeline.del code {
+  background: #3a1c21 !important;
+}
+.diffcode .codeline.add code {
+  color: #8ee89e;
+}
+.diffcode .codeline.del code {
+  color: #ff8791;
+}
+.diffcode .codeline.hunk .lineno,
+.diffcode .codeline.hunk code {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  background: #242126 !important;
+  color: #a9a0b8;
+}
+.diffcode .codeline.file {
+  display: none;
+}
+.diffcode .codeline.add .hljs-keyword,
+.diffcode .codeline.add .hljs-string,
+.diffcode .codeline.add .hljs-title {
+  color: #6bea7c;
+}
+.diffcode .codeline.del .hljs-keyword,
+.diffcode .codeline.del .hljs-string,
+.diffcode .codeline.del .hljs-title {
+  color: #ff7b86;
+}
+@media (max-width: 600px) {
+  .toolevent > .toolcode {
+    margin-left: 0;
+    width: 100%;
+    max-height: 360px;
+  }
+  .toolcode pre {
+    font-size: 12px;
+  }
+  .toolcode .lineno {
+    min-width: 39px;
+    padding: 0 9px 0 5px;
+  }
+}

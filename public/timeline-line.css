@@ -1,0 +1,103 @@
+/* Session minimap: one continuous rail, markers only on interaction. */
+.sessiontimeline {
+  right: 4px;
+  width: 22px;
+  padding: 4px 0;
+}
+.sessiontimeline:before {
+  top: 4px;
+  bottom: 4px;
+  left: 10px;
+  width: 2px;
+  border-radius: 2px;
+  background: #404045;
+}
+.timelinedot,
+.timelinedot.assistant {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 1px;
+  width: 18px;
+  min-height: 2px;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  cursor: pointer;
+}
+.timelinedot:before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transform: translateY(-50%);
+  transition:
+    left 0.12s,
+    width 0.12s,
+    height 0.12s,
+    background 0.12s;
+}
+.timelinedot:hover,
+.timelinedot:focus-visible,
+.timelinedot.active {
+  width: 18px;
+  height: auto;
+  flex-basis: 1px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: 0;
+}
+.timelinedot:hover:before,
+.timelinedot:focus-visible:before {
+  left: 3px;
+  width: 14px;
+  height: 3px;
+  background: #d4d4d8;
+}
+.timelinedot.active:before {
+  left: 5px;
+  width: 10px;
+  height: 4px;
+  background: var(--bash-pink);
+}
+.timelinedot:after {
+  right: 21px;
+  top: 50%;
+  width: 260px;
+  max-width: min(260px, calc(100vw - 310px));
+  padding: 7px 9px;
+  border: 1px solid #3a3a3e;
+  border-radius: 7px;
+  background: #242426;
+  color: #c9c9ce;
+  box-shadow: 0 8px 24px #0007;
+  font:
+    10px/1.35 Arial,
+    Helvetica,
+    sans-serif;
+  white-space: normal;
+  opacity: 0;
+  transform: translateY(-50%) translateX(3px);
+  transition:
+    opacity 0.1s,
+    transform 0.1s;
+}
+.timelinedot:hover:after,
+.timelinedot:focus-visible:after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+@media (max-width: 750px) {
+  .timelinedot:after {
+    width: 210px;
+    max-width: calc(100vw - 70px);
+  }
+}

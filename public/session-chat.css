@@ -1,0 +1,285 @@
+/* Primary session: authored transcript with a right-edge minimap. */
+#session .metrics {
+  height: 86px;
+}
+#session .split {
+  height: calc(100% - 86px);
+}
+#session .split > .pane:first-child {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.conversationwrap {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+.conversation {
+  height: 100%;
+  overflow: auto;
+  padding-right: 31px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: #48484c #18181a;
+}
+.conversation .message {
+  padding: 22px 28px 24px;
+  border-bottom: 1px solid #303033;
+  background: #18181a;
+  scroll-margin-top: 10px;
+}
+.conversation .messageauthor {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 11px;
+}
+.sessionavatar,
+.assistantmark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: linear-gradient(
+    135deg,
+    var(--bash-pink),
+    var(--bash-purple),
+    var(--bash-cyan)
+  );
+  color: #fff;
+  font:
+    800 9px Arial,
+    Helvetica,
+    sans-serif;
+}
+.assistantmark {
+  border-radius: 7px;
+  background: #29292c;
+  color: var(--bash-pink);
+  font-size: 10px;
+}
+.messageauthor > span:last-child {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.messageauthor b {
+  color: #d7d7dc;
+  font:
+    650 12px Arial,
+    Helvetica,
+    sans-serif;
+}
+.messageauthor time {
+  color: #6f6f76;
+  font:
+    9px Arial,
+    Helvetica,
+    sans-serif;
+}
+.conversation .message .role {
+  display: none;
+}
+.conversation .message .body {
+  margin: 0;
+  color: #dedee2;
+  white-space: pre-wrap;
+  font:
+    15px/1.62 Arial,
+    Helvetica,
+    sans-serif;
+}
+.conversation .message .body.markdown {
+  white-space: normal;
+}
+.conversation .message .body.markdown p {
+  margin: 0 0 17px;
+}
+.conversation .message .body.markdown p:last-child {
+  margin-bottom: 0;
+}
+.conversation .markdown h1,
+.conversation .markdown h2,
+.conversation .markdown h3,
+.conversation .markdown h4,
+.conversation .markdown h5,
+.conversation .markdown h6 {
+  position: static;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #f0f0f2;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.conversation .markdown h1 {
+  margin: 27px 0 12px;
+  font-size: 21px;
+}
+.conversation .markdown h2 {
+  margin: 24px 0 11px;
+  font-size: 18px;
+}
+.conversation .markdown h3 {
+  margin: 21px 0 9px;
+  font-size: 16px;
+}
+.conversation .markdown h4,
+.conversation .markdown h5,
+.conversation .markdown h6 {
+  margin: 18px 0 8px;
+  font-size: 15px;
+}
+.conversation .markdown > :first-child {
+  margin-top: 0;
+}
+.conversation .markdown ul,
+.conversation .markdown ol {
+  margin: 10px 0 18px;
+  padding-left: 29px;
+}
+.conversation .markdown li {
+  margin: 6px 0;
+}
+.conversation .markdown strong {
+  color: #fff;
+}
+.conversation .markdown :not(pre) > code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #3a2b3b;
+  color: #ffb1dc;
+  font-size: 13px;
+}
+.sessiontimeline {
+  position: absolute;
+  z-index: 3;
+  right: 5px;
+  top: 10px;
+  bottom: 10px;
+  width: 22px;
+  padding: 5px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  border: 0;
+  background: transparent;
+}
+.sessiontimeline:before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 10px;
+  width: 1px;
+  background: #3b3b3f;
+}
+.timelinedot {
+  position: relative;
+  z-index: 1;
+  display: block;
+  flex: 0 1 2px;
+  width: 5px;
+  min-height: 1px;
+  height: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 1px;
+  background: #55555b;
+  cursor: pointer;
+  overflow: visible;
+  transition:
+    width 0.12s,
+    height 0.12s,
+    background 0.12s,
+    box-shadow 0.12s;
+}
+.timelinedot.assistant {
+  background: #82466c;
+}
+.timelinedot:hover,
+.timelinedot:focus-visible {
+  width: 14px;
+  height: 4px;
+  flex-basis: 4px;
+  border-radius: 2px;
+  background: #d7d7dc;
+  outline: 0;
+  box-shadow: 0 0 0 3px #18181a;
+}
+.timelinedot.active {
+  width: 11px;
+  height: 4px;
+  flex-basis: 4px;
+  border-radius: 2px;
+  background: var(--bash-pink);
+  box-shadow: 0 0 0 3px #18181a;
+}
+.timelinedot:after {
+  content: attr(data-tip);
+  pointer-events: none;
+  position: absolute;
+  right: 19px;
+  top: 50%;
+  width: max-content;
+  max-width: 330px;
+  padding: 7px 9px;
+  border: 1px solid #3a3a3e;
+  border-radius: 7px;
+  background: #242426;
+  color: #d3d3d7;
+  box-shadow: 0 8px 25px #0008;
+  font:
+    10px/1.4 Arial,
+    Helvetica,
+    sans-serif;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  transform: translateY(-50%) translateX(4px);
+  transition:
+    opacity 0.12s,
+    transform 0.12s;
+}
+.timelinedot:hover:after,
+.timelinedot:focus-visible:after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+@media (max-width: 750px) {
+  .conversation {
+    padding-right: 25px;
+  }
+  .conversation .message {
+    padding: 17px 17px 20px;
+  }
+  .conversation .message .body {
+    font-size: 14px;
+  }
+  .conversation .markdown h1 {
+    font-size: 19px;
+  }
+  .conversation .markdown h2 {
+    font-size: 17px;
+  }
+  .conversation .markdown h3 {
+    font-size: 15px;
+  }
+  .sessiontimeline {
+    right: 4px;
+  }
+  .timelinedot:after {
+    max-width: 240px;
+  }
+}

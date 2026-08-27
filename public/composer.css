@@ -1,0 +1,238 @@
+/* Bash.tv-like new-agent composer */
+#agentDialog {
+  width: min(760px, calc(100vw - 28px));
+  padding: 0;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  overflow: visible;
+  box-shadow: none;
+}
+#agentDialog::backdrop {
+  background: #050506c9;
+  backdrop-filter: blur(3px);
+}
+#agentDialog form {
+  position: relative;
+  margin: 0;
+  border: 1px solid #48484d;
+  border-radius: 22px;
+  background: #252527;
+  overflow: hidden;
+  box-shadow:
+    0 24px 80px #000b,
+    0 0 0 1px #ffffff08;
+}
+#agentDialog form:focus-within {
+  border-color: #28d653;
+  box-shadow:
+    0 24px 80px #000b,
+    0 0 0 1px #28d65333;
+}
+.composerhead {
+  height: 46px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #a6a6ac;
+  font:
+    600 11px Arial,
+    Helvetica,
+    sans-serif;
+}
+.composerhead i {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f04bad;
+  box-shadow: -10px 0 #32d7e3;
+}
+.composeravatar {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: linear-gradient(135deg, #f644ad, #8066ff, #19d9e6);
+  color: #fff;
+  font:
+    800 9px Arial,
+    Helvetica,
+    sans-serif;
+}
+#agentPrompt {
+  display: block;
+  width: 100%;
+  min-height: 158px;
+  max-height: 48vh;
+  resize: vertical;
+  padding: 5px 18px 17px;
+  border: 0;
+  box-shadow: none !important;
+  outline: 0;
+  background: #252527;
+  color: #f1f1f3;
+  font:
+    18px/1.5 Arial,
+    Helvetica,
+    sans-serif;
+  caret-color: #36e762;
+}
+#agentPrompt::placeholder {
+  color: #74747a;
+}
+#agentError {
+  margin: 0;
+  padding: 0 18px 11px;
+  color: #ff6874;
+  font:
+    12px Arial,
+    Helvetica,
+    sans-serif;
+}
+#agentError:empty {
+  display: none;
+}
+.composerfoot {
+  min-height: 52px;
+  padding: 9px 11px 9px 16px;
+  border-top: 1px solid #363639;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: #202022;
+}
+.composercontext,
+.composeractions {
+  display: flex;
+  align-items: center;
+}
+.composercontext {
+  gap: 8px;
+  color: #8b8b91;
+  font:
+    11px Arial,
+    Helvetica,
+    sans-serif;
+}
+.composerspark {
+  position: relative;
+  width: 15px;
+  height: 15px;
+}
+.composerspark:before,
+.composerspark:after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 7px;
+  width: 9px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: #b0b0b5;
+}
+.composerspark:after {
+  transform: rotate(90deg);
+}
+.composerlevel {
+  padding-left: 8px;
+  border-left: 1px solid #3b3b3e;
+  color: #717177;
+}
+.composeractions {
+  gap: 13px;
+  color: #74747a;
+  font:
+    10px Arial,
+    Helvetica,
+    sans-serif;
+}
+.composeractions kbd {
+  border: 0;
+  background: transparent;
+  color: #a4a4aa;
+  font:
+    10px ui-monospace,
+    SFMono-Regular,
+    monospace;
+}
+.composeractions button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: #31df55;
+  color: #0c160e;
+  cursor: pointer;
+  transition:
+    transform 0.12s,
+    filter 0.12s;
+}
+.composeractions button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.composeractions button:active {
+  transform: translateY(0);
+}
+.composeractions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.composeractions svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.composeractions button.loading svg {
+  animation: composerPulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes composerPulse {
+  to {
+    transform: translateY(-2px);
+    opacity: 0.55;
+  }
+}
+@media (max-width: 600px) {
+  #agentDialog {
+    width: calc(100vw - 20px);
+    border-radius: 18px;
+  }
+  #agentDialog form {
+    border-radius: 18px;
+  }
+  .composerhead {
+    height: 42px;
+    padding: 0 13px;
+  }
+  #agentPrompt {
+    min-height: 135px;
+    padding: 5px 14px 14px;
+    font-size: 16px;
+  }
+  .composerfoot {
+    padding: 8px 9px 8px 13px;
+  }
+  .composeractions > span {
+    display: none;
+  }
+  .composercontext {
+    font-size: 10px;
+  }
+  .composeractions button {
+    width: 33px;
+    height: 33px;
+  }
+}

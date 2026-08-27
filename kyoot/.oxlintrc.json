@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "require-yield": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test-d.ts"],
+      "rules": { "no-unused-vars": "off" }
+    }
+  ],
+  "ignorePatterns": ["node_modules"]
+}

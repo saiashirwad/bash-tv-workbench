@@ -1,0 +1,19 @@
+{
+  "name": "kyoot-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint",
+    "typecheck": "node ../scripts/run-package-script.mjs typecheck",
+    "test": "node ../scripts/run-package-script.mjs test",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "oxfmt": "^0.64.0",
+    "oxlint": "^1.79.0",
+    "typescript": "^7.0.2"
+  }
+}

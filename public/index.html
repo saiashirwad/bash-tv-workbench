@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Bash Workbench</title>
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/bash-theme.css" />
+    <link rel="stylesheet" href="/transcript.css" />
+    <link rel="stylesheet" href="/final-markdown.css" />
+    <link rel="stylesheet" href="/composer.css" />
+    <link rel="stylesheet" href="/tool-code.css" />
+    <link rel="stylesheet" href="/synthwave-code.css" />
+    <link rel="stylesheet" href="/session-chat.css" />
+    <link rel="stylesheet" href="/followup.css" />
+    <link rel="stylesheet" href="/timeline-line.css" />
+    <link rel="stylesheet" href="/timeline-preview.css" />
+    <link rel="stylesheet" href="/compact-rail.css" />
+    <link rel="stylesheet" href="/whimsy-icons.css" />
+    <link rel="stylesheet" href="/live-scrollbar.css" />
+    <link rel="stylesheet" href="/followup-composer.css" />
+    <link rel="stylesheet" href="/top-nav.css" />
+    <link rel="stylesheet" href="/explorer-trajectory.css" />
+    <link rel="stylesheet" href="/git-view.css" />
+    <link rel="stylesheet" href="/workflows.css" />
+    <link rel="stylesheet" href="/webmcp-connect.css" />
+    <link rel="stylesheet" href="/brand.css" />
+    <link rel="stylesheet" href="/auth.css" />
+  </head>
+  <body class="auth-pending">
+    <aside id="openAccessWarning" class="openaccesswarning" role="status" hidden>
+      EXPERIMENTAL OPEN ACCESS — anyone viewing this Workbench can run agents, commands, and file operations.
+    </aside>
+    <dialog id="authDialog" class="authdialog" aria-labelledby="authTitle" aria-describedby="authDescription authRoles">
+      <form id="authForm" class="authcard" method="dialog">
+        <div class="authbrand" aria-label="Bash.tv Workbench">
+          <span class="bashface" aria-hidden="true"><i></i><i></i><em></em></span><b><span>BASH</span><small>.TV</small></b><span class="authbranddivider"></span><strong>WORKBENCH</strong>
+        </div>
+        <div class="authintro"><span class="autheyebrow">PRIVATE WORKSPACE</span><h1 id="authTitle">Sign in to Workbench</h1><p id="authDescription">Enter the credential shared with you by this Workbench’s owner.</p></div>
+        <div id="authRoles" class="authroles"><p><b>Owner</b><span>Full workspace administration and access.</span></p><p><b>Collaborator</b><span>Access granted by the workspace owner.</span></p></div>
+        <label class="authfield" for="authCredential"><span>OWNER OR COLLABORATOR CREDENTIAL</span><input class="sr-only" name="username" autocomplete="username" value="workbench" tabindex="-1" aria-hidden="true" /><input id="authCredential" name="credential" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required aria-describedby="authHint authError" /></label>
+        <small id="authHint" class="authhint">Your credential is exchanged for a secure, HttpOnly browser session and is not stored by this page.</small>
+        <div id="authError" class="autherror" role="alert" aria-live="assertive"></div>
+        <button id="authSubmit" class="authsubmit" type="submit"><span id="authSubmitLabel">ENTER WORKBENCH</span><span aria-hidden="true">→</span></button>
+      </form>
+    </dialog>
+    <header>
+      <div class="brand" aria-label="Bash Workbench">
+        <span class="bashface" aria-hidden="true"><i></i><i></i><em></em></span>
+        <b><span class="brandbash">BASH</span><span class="brandtv">.TV</span><span class="branddivider"></span><span class="brandworkbench">WORKBENCH</span></b>
+      </div>
+      <div class="projectpicker headerprojectpicker">
+        <button
+          id="projectToggle"
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          title="Switch active project"
+        >
+          <span class="projectmark" aria-hidden="true"></span
+          ><span id="projectName">Project</span
+          ><svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="m6 8 4 4 4-4" />
+          </svg>
+        </button>
+        <div
+          id="projectMenu"
+          class="projectmenu hidden"
+          role="listbox"
+          aria-label="Project"
+        ></div>
+      </div>
+      <button id="quickOpen" title="Open files or commands (Ctrl/Cmd+P)">
+        <span class="quickopenicon">⌕</span><span class="quickopenlabel">Search files or commands</span><kbd>⌘P</kbd>
+      </button>
+      <nav id="topNav" aria-label="Workbench navigation">
+        <button data-page="session" class="active" title="Live">
+          <i
+            ><svg
+              class="navicon liveicon"
+              viewBox="0 0 20 20"
+              aria-hidden="true"
+            >
+              <path
+                d="M3 10s2.6-3.5 7-3.5 7 3.5 7 3.5-2.6 3.5-7 3.5S3 10 3 10Z"
+              />
+              <circle cx="10" cy="10" r="2" class="fill" /></svg></i
+          ><span>Live</span></button
+        ><button data-page="agents" title="Agents">
+          <i
+            ><svg
+              class="navicon agenticon"
+              viewBox="0 0 20 20"
+              aria-hidden="true"
+            >
+              <path
+                d="m10 3 1.4 5.6L17 10l-5.6 1.4L10 17l-1.4-5.6L3 10l5.6-1.4Z"
+                class="fill"
+              /></svg></i
+          ><span>Agents</span></button
+        ><button data-page="files" title="Files">
+          <i
+            ><svg
+              class="navicon filesicon"
+              viewBox="0 0 20 20"
+              aria-hidden="true"
+            >
+              <path d="M5 3.5h7l3 3v10H5Z" />
+              <path d="M12 3.5v3h3" />
+              <circle cx="8" cy="12.5" r="1" class="fill" /></svg></i
+          ><span>Files</span></button
+        ><button data-page="git" title="Git">
+          <i
+            ><svg
+              class="navicon giticon"
+              viewBox="0 0 20 20"
+              aria-hidden="true"
+            >
+              <circle cx="6" cy="5" r="1.6" class="fill" />
+              <circle cx="14" cy="15" r="1.6" class="fill" />
+              <circle cx="14" cy="6" r="1.4" />
+              <path d="M6 6.6v3.2c0 2.8 2 4.1 5.2 4.1h1.2M14 7.4v6" /></svg></i
+          ><span>Git</span>
+        </button>
+        <button id="webmcpConnect" class="webmcpconnect" type="button" title="Connect Claude Code or Codex through WebMCP">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 6.5V4m5 2.5V4M5 9h10v2.5a5 5 0 0 1-5 5 5 5 0 0 1-5-5ZM3 9h14M10 16.5V19" /></svg><span>Connect</span>
+        </button>
+        <div class="linkmenu">
+          <button
+            id="linkToggle"
+            type="button"
+            title="Deep link"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                d="M8 12l4-4M6.5 14.5l-1 1a3 3 0 0 1-4-4l3-3a3 3 0 0 1 4 0M13.5 5.5l1-1a3 3 0 0 1 4 4l-3 3a3 3 0 0 1-4 0"
+              /></svg
+            ><span>Link</span>
+          </button>
+          <div id="linkMenu" class="linkpopover hidden">
+            <div id="deepLinkText"></div>
+            <button id="copyDeepLink" type="button">Copy link</button>
+            <a id="openDeepLink" target="_blank" rel="noopener">Open ↗</a>
+          </div>
+        </div>
+        <div class="downloadmenu">
+          <button
+            id="downloadToggle"
+            type="button"
+            title="Downloads"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M10 3v9m-3-3 3 3 3-3M4 16h12" /></svg
+            ><span>Downloads</span>
+          </button>
+          <div id="downloadMenu" class="downloadpopover hidden">
+            <small id="downloadProjectName"></small>
+            <a id="downloadSource">Source ZIP</a>
+            <a id="downloadBundle">Git bundle</a>
+            <a href="/api/projects/kyoot-workbench/source.zip" download="kyoot-workbench-standalone.zip">Standalone Workbench ZIP</a>
+          </div>
+        </div>
+      </nav>
+      <div id="identity">
+        <span class="identityavatar fallback">B</span><span>Bash.tv</span>
+      </div>
+    </header>
+    <div class="layout">
+      <main>
+        <section id="session" class="page">
+          <span id="live" class="sr-only">LOADING</span>
+          <div class="livetabs" role="tablist">
+            <div class="segmentedcontrol">
+              <button id="trajectoryTab" role="tab" aria-selected="false">
+                Trajectory
+              </button>
+              <button id="chatTab" class="active" role="tab" aria-selected="true">
+                Live Chat
+              </button>
+            </div>
+          </div>
+          <div id="liveChatView" class="liveview">
+            <div id="metrics" class="metrics"></div>
+            <div class="split">
+              <div class="pane">
+                <h2>MESSAGES</h2>
+                <div class="conversationwrap">
+                  <div id="conversation" class="conversation"></div>
+                  <nav
+                    id="sessionTimeline"
+                    class="sessiontimeline"
+                    aria-label="Session message timeline"
+                  ></nav>
+                </div>
+              </div>
+              <aside class="pane">
+                <h2>TOOLS</h2>
+                <div id="tools"></div>
+                <h2>PROCESS</h2>
+                <pre id="runtime"></pre>
+              </aside>
+            </div>
+          </div>
+          <div id="trajectoryView" class="liveview hidden">
+            <div id="trajectoryOverview"></div>
+            <div class="trajectorybody">
+              <div class="trajectorymain">
+                <div class="trajectoryfilter">
+                  <input
+                    id="trajectorySearch"
+                    placeholder="Search trajectory"
+                  /><span id="trajectoryCount"></span>
+                </div>
+                <div
+                  id="trajectoryEvents"
+                  tabindex="0"
+                  role="feed"
+                  aria-label="Trajectory events"
+                ></div>
+              </div>
+              <aside id="trajectoryInspect">
+                <div class="trajectoryempty">Select an event</div>
+              </aside>
+            </div>
+          </div>
+        </section>
+        <section id="agents" class="page hidden">
+          <div class="agentlayout">
+            <aside class="agentrail">
+              <div class="agentsearch">
+                <input id="agentSearch" placeholder="Filter" /><button
+                  id="newAgent"
+                >
+                  + NEW
+                </button>
+              </div>
+              <div class="agentmodetabs" role="tablist">
+                <button id="runsMode" class="active" type="button">RUNS</button>
+                <button id="workflowsMode" type="button">WORKFLOWS</button>
+              </div>
+              <div id="agentList" class="agentlist"></div>
+              <div id="workflowList" class="agentlist hidden"></div>
+            </aside>
+            <div id="agentDetail" class="agentdetail">
+              <div class="agentempty">NO AGENT SELECTED</div>
+            </div>
+            <div id="workflowDetail" class="agentdetail hidden">
+              <div class="agentempty">NO WORKFLOW SELECTED</div>
+            </div>
+            <aside id="agentInspect" class="agentinspect">
+              <div class="inspecttoolbar">
+                <h2>DETAILS</h2>
+                <button id="toggleAgentInspect" class="toggleinspectbtn" title="Toggle inspector sidebar (⌘I)">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 10h8M10 6l4 4-4 4"/></svg>
+                </button>
+              </div>
+              <div id="agentMeta"></div>
+              <h2>CHANGES</h2>
+              <div id="agentChanges"></div>
+            </aside>
+          </div>
+        </section>
+        <section id="files" class="page hidden">
+          <div class="files">
+            <div class="tree">
+              <div class="explorerhead">
+                <div class="explorertitle">
+                  <b>Explorer</b>
+                  <button
+                    id="collapseTree"
+                    title="Collapse all folders"
+                    aria-label="Collapse folders"
+                  >
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" /></svg>
+                  </button>
+                </div>
+                <div class="treefilterwrap">
+                  <span class="treefiltericon">⌕</span>
+                  <input id="filter" placeholder="Filter files…" aria-label="Filter files" />
+                </div>
+              </div>
+              <div id="tree"></div>
+            </div>
+            <div class="viewer">
+              <div class="viewerbar">
+                <div id="filepath" class="filebreadcrumbs">NO FILE</div>
+                <span class="editoractions"
+                  ><span id="saveStatus"></span
+                  ><button id="saveFile" class="hidden" disabled>SAVE</button
+                  ><a id="raw" class="hidden" target="_blank">RAW ↗</a></span
+                >
+              </div>
+              <div id="editor" class="hidden"></div>
+              <div id="media"></div>
+            </div>
+          </div>
+        </section>
+        <section id="git" class="page hidden">
+          <div class="githead">
+            <div class="gitproject">
+              <span class="projectmark" aria-hidden="true"></span>
+              <span><small>Repository</small><b id="gitProjectName"></b></span>
+            </div>
+            <button id="gitProjectToggle" type="button">Switch</button>
+            <div id="gitProjectMenu" class="gitprojectmenu hidden"></div>
+            <span id="branch" class="gitbranch"></span>
+            <span id="gitSync" class="gitsync"></span>
+            <button id="refreshGit">Refresh</button>
+          </div>
+          <div id="latestCommit" class="latestcommit"></div>
+          <div class="gitgrid">
+            <div class="gitcolumn">
+              <h2>Working tree</h2>
+              <pre id="status"></pre>
+            </div>
+            <div class="gitcolumn gitlogcolumn">
+              <h2>History</h2>
+              <div id="commits"></div>
+            </div>
+            <aside id="commitDetail" class="commitdetail">
+              <div class="gitempty">Select a commit</div>
+            </aside>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div
+      id="filePalette"
+      class="palette hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="filePaletteLabel"
+    >
+      <div class="palettebox">
+        <div id="filePaletteLabel" class="sr-only">Open file</div>
+        <input
+          id="fileQuery"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="false"
+          aria-controls="fileResults"
+          aria-activedescendant=""
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Search files by name or path"
+        />
+        <div id="fileResults" role="listbox" aria-label="Matching files"></div>
+        <div
+          id="fileResultStatus"
+          class="sr-only"
+          aria-live="polite"
+          aria-atomic="true"
+        ></div>
+        <div class="palettehint">
+          ↑↓ SELECT · HOME/END FIRST/LAST · ENTER OPEN · ESC CLOSE
+        </div>
+      </div>
+    </div>
+    <dialog id="webmcpDialog" class="webmcpdialog" aria-labelledby="webmcpTitle">
+      <div class="webmcpshell">
+        <header class="webmcphead">
+          <div><span class="webmcpeyebrow">DESKTOP AGENT BRIDGE</span><h2 id="webmcpTitle">Connect to Workbench</h2></div>
+          <button id="closeWebmcp" type="button" aria-label="Close WebMCP setup">×</button>
+        </header>
+        <div class="webmcpstatus"><span id="webmcpStatusMark"></span><div><b id="webmcpStatusTitle">Checking browser support…</b><small id="webmcpStatusText">The desktop bridge launches its own WebMCP-enabled Chrome.</small></div></div>
+        <p class="webmcpintro">Expose this Workbench’s typed project, file, Git, agent, and workflow tools to your coding assistant. Run one command on the computer where Claude Code or Codex is installed.</p>
+        <div class="webmcptabs" role="tablist" aria-label="Coding assistant">
+          <button id="webmcpClaudeTab" class="active" type="button" role="tab" aria-selected="true" data-webmcp-client="claude">Claude Code</button>
+          <button id="webmcpCodexTab" type="button" role="tab" aria-selected="false" data-webmcp-client="codex">Codex</button>
+        </div>
+        <section class="webmcpstep">
+          <div class="webmcpstepnum">1</div><div class="webmcpstepbody"><b>Add the Chrome bridge</b><small>Requires Node.js 20+ and Chrome 150+.</small>
+            <div class="webmcpcopy"><code id="webmcpCommand"></code><button type="button" data-copy-webmcp="command">Copy</button></div>
+          </div>
+        </section>
+        <section class="webmcpstep">
+          <div class="webmcpstepnum">2</div><div class="webmcpstepbody"><b>Start a fresh assistant session, then paste this</b><small>The assistant will open this Workbench and discover its page tools.</small>
+            <div class="webmcpcopy webmcpprompt"><code id="webmcpPrompt"></code><button type="button" data-copy-webmcp="prompt">Copy</button></div>
+          </div>
+        </section>
+        <footer class="webmcpfoot"><span><b id="webmcpToolCount">48 tools</b> · shell, processes, artifacts, files, Git, runs, workflows</span><a href="/api/projects/kyoot-workbench/raw?path=WEBMCP.md" target="_blank" rel="noopener">Setup details ↗</a></footer>
+      </div>
+    </dialog>
+    <dialog id="agentDialog" aria-label="New agent">
+      <form id="agentForm">
+        <div class="composerhead">
+          <span id="composerAvatar" class="composeravatar fallback">B</span
+          ><span>New agent</span><i aria-hidden="true"></i>
+        </div>
+        <textarea
+          id="agentPrompt"
+          name="prompt"
+          required
+          maxlength="20000"
+          rows="6"
+          placeholder="What should the agent do?"
+        ></textarea>
+        <div id="agentError"></div>
+        <div class="composerfoot">
+          <div class="composercontext">
+            <span class="composerspark" aria-hidden="true"></span
+            ><span>bashtv/free</span><span class="composerlevel">low</span>
+          </div>
+          <div class="composeractions">
+            <span><kbd>⌘↵</kbd> start</span><span><kbd>esc</kbd> close</span
+            ><button id="submitAgent" type="submit" aria-label="Start agent">
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M10 15V5m-4 4 4-4 4 4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+    <script type="module" src="/app.d203f308eb651192.js"></script>
+  </body>
+</html>

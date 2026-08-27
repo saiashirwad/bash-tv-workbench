@@ -1,0 +1,85 @@
+/* Simple playful glyphs on one optical center. */
+.layout > nav .navicon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.55;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+.layout > nav .navicon .fill {
+  fill: currentColor;
+  stroke: currentColor;
+}
+.layout > nav button > i,
+.layout > nav a > i {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+}
+.layout > nav button,
+.layout > nav a {
+  color: #9b9ba3;
+}
+.layout > nav button[data-page="session"] i {
+  color: #62d9ef;
+}
+.layout > nav button[data-page="agents"] i {
+  color: #ffd84d;
+}
+.layout > nav button[data-page="files"] i {
+  color: #f477bd;
+}
+.layout > nav button[data-page="git"] i {
+  color: #72e878;
+}
+.layout > nav a:nth-of-type(1) i {
+  color: #56d8e5;
+}
+.layout > nav a:nth-of-type(2) i {
+  color: #a98cff;
+}
+.layout > nav a:nth-of-type(3) i {
+  color: #ff7eaa;
+}
+.layout > nav button:not(.active) i,
+.layout > nav a i {
+  filter: saturate(0.55);
+  opacity: 0.82;
+}
+.layout > nav button:hover i,
+.layout > nav button.active i,
+.layout > nav a:hover i {
+  filter: none;
+  opacity: 1;
+}
+.layout > nav button.active .navicon {
+  transform: none;
+}
+.layout > nav button,
+.layout > nav a {
+  transition:
+    background 0.13s,
+    border-radius 0.13s;
+}
+.layout > nav button:hover,
+.layout > nav a:hover {
+  transform: none;
+}
+@media (max-width: 600px) {
+  .layout > nav .navicon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 1.6;
+  }
+  .layout > nav button > i {
+    width: 18px;
+    height: 18px;
+    flex-basis: 18px;
+  }
+}

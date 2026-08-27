@@ -1,0 +1,25 @@
+{
+  "name": "@kyoot/workbench-protocol",
+  "version": "0.1.0",
+  "description": "Typed RPC and sync contracts for Bash Workbench",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./browser": "./src/browser.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@kyoot/rpc": "*",
+    "@kyoot/sync": "*",
+    "kyoot": "*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2"
+  }
+}

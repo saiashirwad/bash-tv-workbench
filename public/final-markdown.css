@@ -1,0 +1,192 @@
+/* Final assistant responses get document rhythm; process events remain quiet. */
+.messageevent {
+  padding: 22px 0 18px;
+}
+.messageevent .eventtext,
+.messageevent .markdown {
+  font:
+    15px/1.68 Arial,
+    Helvetica,
+    sans-serif;
+  color: #ededf0;
+}
+.messageevent .markdown p {
+  margin: 0 0 18px;
+}
+.messageevent .markdown p:last-child {
+  margin-bottom: 0;
+}
+.messageevent .markdown h1,
+.messageevent .markdown h2,
+.messageevent .markdown h3,
+.messageevent .markdown h4,
+.messageevent .markdown h5,
+.messageevent .markdown h6 {
+  position: static;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #f1f1f3;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.messageevent .markdown h1 {
+  margin: 30px 0 13px;
+  font-size: 21px;
+}
+.messageevent .markdown h2 {
+  margin: 27px 0 12px;
+  font-size: 18px;
+}
+.messageevent .markdown h3 {
+  margin: 23px 0 10px;
+  font-size: 16px;
+}
+.messageevent .markdown h4,
+.messageevent .markdown h5,
+.messageevent .markdown h6 {
+  margin: 20px 0 8px;
+  font-size: 15px;
+}
+.messageevent .markdown > :first-child {
+  margin-top: 0;
+}
+.messageevent .markdown ul,
+.messageevent .markdown ol {
+  margin: 11px 0 20px;
+  padding-left: 31px;
+}
+.messageevent .markdown li {
+  margin: 7px 0;
+  padding-left: 3px;
+}
+.messageevent .markdown li::marker {
+  color: #d7d7db;
+}
+.messageevent .markdown strong {
+  color: #fff;
+  font-weight: 700;
+}
+.messageevent .markdown em {
+  color: #c9c9ce;
+}
+.messageevent .markdown a {
+  color: #35d8e4;
+  text-decoration: none;
+}
+.messageevent .markdown a:hover {
+  text-decoration: underline;
+}
+.messageevent .markdown :not(pre) > code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #3a2b3b;
+  color: #ffb1dc;
+  font:
+    13px ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+}
+.messageevent .markdown blockquote {
+  margin: 18px 0;
+  padding: 2px 0 2px 16px;
+  border-left: 3px solid #4b4b50;
+  color: #bdbdc3;
+}
+.messageevent .markdown hr {
+  height: 1px;
+  margin: 28px 0;
+  border: 0;
+  background: #353538;
+}
+.messageevent .markdown .codeblock {
+  margin: 20px 0 23px;
+  border: 1px solid #36363b;
+  border-radius: 11px;
+  background: #0d1015;
+  overflow: hidden;
+}
+.messageevent .markdown .codelabel {
+  height: 34px;
+  padding: 0 13px;
+  border-bottom: 1px solid #323238;
+  background: #11141a;
+  color: #f04eae;
+  font:
+    11px/34px Arial,
+    Helvetica,
+    sans-serif;
+  text-transform: lowercase;
+}
+.messageevent .markdown .codeblock pre {
+  margin: 0;
+  padding: 15px;
+  overflow: auto;
+  background: #0d1015;
+  white-space: pre;
+}
+.messageevent .markdown .codeblock code {
+  font:
+    13px/1.58 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+}
+.messageevent .markdown table {
+  margin: 19px 0 23px;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #38383c;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.messageevent .markdown th,
+.messageevent .markdown td {
+  padding: 8px 11px;
+  border: 0;
+  border-right: 1px solid #38383c;
+  border-bottom: 1px solid #38383c;
+}
+.messageevent .markdown th:last-child,
+.messageevent .markdown td:last-child {
+  border-right: 0;
+}
+.messageevent .markdown tr:last-child td {
+  border-bottom: 0;
+}
+.messageevent .markdown th {
+  background: #262628;
+  color: #fff;
+}
+@media (max-width: 600px) {
+  .messageevent {
+    padding: 17px 0 14px;
+  }
+  .messageevent .eventtext,
+  .messageevent .markdown {
+    font-size: 14px;
+    line-height: 1.62;
+  }
+  .messageevent .markdown h1 {
+    font-size: 19px;
+  }
+  .messageevent .markdown h2 {
+    font-size: 17px;
+  }
+  .messageevent .markdown h3 {
+    font-size: 15px;
+  }
+  .messageevent .markdown .codeblock {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .messageevent .markdown .codeblock code {
+    font-size: 12px;
+  }
+}

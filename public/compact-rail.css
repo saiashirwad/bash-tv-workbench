@@ -1,0 +1,185 @@
+/* Discord-like compact app rail: navigation only, content owns the width. */
+.layout {
+  grid-template-columns: 68px minmax(0, 1fr);
+}
+.layout > nav {
+  width: 68px;
+  padding: 10px 8px;
+  background: #101011;
+  align-items: center;
+  border-right: 1px solid #29292c;
+  overflow: visible;
+}
+.layout > nav .navlabel {
+  display: none;
+}
+.layout > nav button,
+.layout > nav a {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: 2px 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #232325;
+  color: #a7a7ad;
+  line-height: 1;
+}
+.layout > nav button:hover,
+.layout > nav a:hover {
+  border-radius: 11px;
+  background: #303034;
+  color: #fff;
+}
+.layout > nav button.active {
+  border-radius: 11px;
+  background: #3b3541;
+  color: #fff;
+}
+.layout > nav button > i,
+.layout > nav a > i {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+.layout > nav svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.6;
+}
+.layout > nav button > span,
+.layout > nav a > span {
+  display: none;
+}
+.layout > nav button:after,
+.layout > nav a:after {
+  content: attr(title);
+  pointer-events: none;
+  position: absolute;
+  z-index: 20;
+  left: 53px;
+  top: 50%;
+  width: max-content;
+  padding: 6px 9px;
+  border: 1px solid #3a3a3e;
+  border-radius: 7px;
+  background: #242426;
+  color: #ededf0;
+  box-shadow: 0 7px 22px #0009;
+  font:
+    11px/1.2 Arial,
+    Helvetica,
+    sans-serif;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-50%) translateX(-3px);
+  transition:
+    opacity 0.1s,
+    transform 0.1s,
+    visibility 0s linear 0.1s;
+}
+.layout > nav button:hover:after,
+.layout > nav button:focus-visible:after,
+.layout > nav a:hover:after,
+.layout > nav a:focus-visible:after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+  transition-delay: 0s;
+}
+.layout > nav button[data-page="session"].active {
+  background: #3c2838;
+}
+.layout > nav button[data-page="agents"].active {
+  background: #413d28;
+}
+.layout > nav button[data-page="files"].active {
+  background: #233a3e;
+}
+.layout > nav button[data-page="git"].active {
+  background: #283b2d;
+}
+.layout > nav .downloads + a {
+  margin-top: auto;
+}
+.layout > nav .downloads + a:before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: -8px;
+  height: 1px;
+  background: #303033;
+}
+.layout > nav .navfill {
+  display: none;
+}
+@media (max-width: 850px) {
+  .layout {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+  .layout > nav {
+    width: 58px;
+    padding-left: 7px;
+    padding-right: 7px;
+  }
+  .layout > nav button,
+  .layout > nav a {
+    width: 42px;
+    height: 42px;
+    min-height: 42px;
+  }
+  .layout > nav button:after,
+  .layout > nav a:after {
+    left: 48px;
+  }
+}
+@media (max-width: 600px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 52px;
+  }
+  .layout > nav {
+    width: 100%;
+    padding: 4px 8px;
+    align-items: stretch;
+  }
+  .layout > nav button {
+    width: auto;
+    height: 43px;
+    min-height: 43px;
+    margin: 0;
+    background: transparent;
+    border-radius: 9px;
+  }
+  .layout > nav button:hover,
+  .layout > nav button.active {
+    border-radius: 9px;
+  }
+  .layout > nav button > span {
+    display: block;
+  }
+  .layout > nav button:after {
+    display: none;
+  }
+  .layout > nav a,
+  .layout > nav .downloads,
+  .layout > nav .navfill {
+    display: none !important;
+  }
+  .agentlayout {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 42% 58% !important;
+  }
+  .agentrail {
+    height: auto !important;
+    min-height: 0;
+  }
+  .agentdetail {
+    height: auto !important;
+    min-height: 0;
+  }
+}

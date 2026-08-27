@@ -1,0 +1,53 @@
+header #topNav > .webmcpconnect {
+  flex: 0 0 auto;
+  width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid #5a3a78;
+  border-radius: 20px;
+  background: #30243d;
+  color: #e5d7f2;
+  cursor: pointer;
+  font: 650 12px Arial, sans-serif;
+}
+.webmcpconnect:hover { background: #3b2b4b; border-color: #76509a; color: #fff; }
+.webmcpconnect svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.webmcpdialog { width: min(650px, calc(100vw - 28px)); max-height: min(780px, calc(100vh - 28px)); padding: 0; overflow: auto; border: 1px solid #45404b; border-radius: 14px; background: #1b1b1e; color: #eeeef2; box-shadow: 0 28px 90px #000c; }
+.webmcpdialog::backdrop { background: #09090bbd; backdrop-filter: blur(3px); }
+.webmcpshell { padding: 24px; }
+.webmcphead { position: static; width: auto; height: auto; padding: 0 0 18px; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid #333238; background: transparent; }
+.webmcphead h2 { margin: 4px 0 0; color: #fff; font: 700 22px/1.2 Arial, sans-serif; letter-spacing: -.02em; }
+.webmcpeyebrow { color: #ac7bd2; font: 700 10px/1 Arial, sans-serif; letter-spacing: .12em; }
+.webmcphead #closeWebmcp { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 5px; background: #29292d; color: #aaaab2; cursor: pointer; font: 22px/28px Arial; }
+.webmcphead #closeWebmcp:hover { background: #35353a; color: #fff; }
+.webmcpstatus { margin: 18px 0 14px; padding: 12px 14px; display: flex; align-items: center; gap: 11px; border: 1px solid #36343b; background: #222126; }
+.webmcpstatus > span { width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; background: #777780; }
+.webmcpstatus > span.ready { background: #5fc89b; }
+.webmcpstatus > span.bridge { background: #b383dc; }
+.webmcpstatus b, .webmcpstatus small { display: block; }
+.webmcpstatus b { margin-bottom: 3px; font: 650 12px Arial, sans-serif; }
+.webmcpstatus small { color: #92929b; font: 11px/1.4 Arial, sans-serif; }
+.webmcpintro { margin: 0 0 18px; color: #aaaab3; font: 12px/1.55 Arial, sans-serif; }
+.webmcptabs { display: flex; gap: 0; border-bottom: 1px solid #39383e; }
+.webmcptabs button { position: relative; height: 39px; padding: 0 18px; border: 0; background: transparent; color: #8f8f98; cursor: pointer; font: 650 12px Arial, sans-serif; }
+.webmcptabs button.active { color: #fff; }
+.webmcptabs button.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: #a86fd5; }
+.webmcpstep { margin-top: 18px; display: grid; grid-template-columns: 25px minmax(0,1fr); gap: 11px; }
+.webmcpstepnum { width: 23px; height: 23px; display: grid; place-items: center; border: 1px solid #504658; color: #bb91d9; font: 700 11px Arial; }
+.webmcpstepbody > b, .webmcpstepbody > small { display: block; }
+.webmcpstepbody > b { margin: 3px 0 3px; font: 650 12px Arial, sans-serif; }
+.webmcpstepbody > small { color: #85858e; font: 11px/1.45 Arial, sans-serif; }
+.webmcpcopy { margin-top: 9px; display: grid; grid-template-columns: minmax(0,1fr) auto; border: 1px solid #37363c; background: #141416; }
+.webmcpcopy code { min-width: 0; max-height: 125px; padding: 11px 12px; overflow: auto; color: #d8d3dd; white-space: pre-wrap; overflow-wrap: anywhere; font: 10px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.webmcpcopy button { align-self: stretch; min-width: 60px; border: 0; border-left: 1px solid #37363c; background: #29282d; color: #c4c4ca; cursor: pointer; font: 650 10px Arial, sans-serif; }
+.webmcpcopy button:hover { background: #37353d; color: #fff; }
+.webmcpprompt code { color: #bcd8ca; }
+.webmcpfoot { position: static; width: auto; height: auto; margin-top: 22px; padding: 15px 0 0; display: flex; justify-content: space-between; border-top: 1px solid #333238; background: transparent; color: #777780; font: 10px Arial, sans-serif; }
+.webmcpfoot b { color: #aaaab2; }
+.webmcpfoot a { color: #b58ad4; text-decoration: none; }
+@media (max-width: 1050px) { .webmcpconnect { height: 36px; padding: 0 8px; } .webmcpconnect span { display: none; } }
+@media (max-width: 760px) { .webmcpconnect { flex: 0 0 34px; width: 34px; height: 34px; padding: 0; } .webmcpshell { padding: 18px; } .webmcpfoot { align-items: flex-start; flex-direction: column; gap: 9px; } }

@@ -1,0 +1,372 @@
+#git {
+  display: grid;
+  grid-template-rows: 50px 64px minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+.githead {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 13px;
+  border-bottom: 1px solid #303033;
+  background: #18181a;
+}
+.gitproject {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 220px;
+}
+.gitproject > span:last-child {
+  display: flex;
+  flex-direction: column;
+}
+.gitproject small {
+  color: #727279;
+  font: 8px Arial;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+.gitproject b {
+  margin-top: 2px;
+  font: 650 12px Arial;
+}
+.githead > button {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 14px;
+  background: #29292c;
+  color: #bcbcc2;
+  font: 600 10px Arial;
+}
+.githead > button:hover {
+  background: #353539;
+  color: #fff;
+}
+.githead #refreshGit {
+  margin-left: auto;
+}
+.gitbranch {
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: #272431;
+  color: #d2b2ff;
+  font:
+    10px ui-monospace,
+    monospace;
+}
+.gitsync {
+  color: #818188;
+  font: 10px Arial;
+}
+.gitprojectmenu {
+  position: absolute;
+  z-index: 20;
+  left: 10px;
+  top: 44px;
+  width: 330px;
+  padding: 5px;
+  border: 1px solid #414146;
+  border-radius: 8px;
+  background: #202022;
+  box-shadow: 0 14px 38px #000b;
+}
+.gitprojectmenu button {
+  width: 100%;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #ddd;
+  text-align: left;
+}
+.gitprojectmenu button:hover,
+.gitprojectmenu button.selected {
+  background: #302631;
+}
+.gitprojectmenu b {
+  font: 600 12px Arial;
+}
+.gitprojectmenu small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #85858c;
+  font:
+    9px ui-monospace,
+    monospace;
+  white-space: nowrap;
+}
+.latestcommit {
+  display: grid;
+  grid-template-columns: 50px 70px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid #303033;
+  background: #1d1d1f;
+}
+.latestcommit > span {
+  color: #7e7e85;
+  font: 800 9px Arial;
+  text-transform: uppercase;
+}
+.latestcommit code {
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: #32273a;
+  color: #ff72c0;
+  font:
+    10px ui-monospace,
+    monospace;
+}
+.latestcommit b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 650 13px Arial;
+  white-space: nowrap;
+}
+.latestcommit small {
+  color: #88888f;
+  font: 9px Arial;
+}
+.gitgrid {
+  height: auto !important;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 280px minmax(390px, 1fr) 370px !important;
+  overflow: hidden;
+}
+.gitcolumn,
+.commitdetail {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  border-right: 1px solid #303033;
+  background: #171719;
+}
+.gitcolumn h2 {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.gitcolumn #status {
+  font-size: 11px;
+  color: #aaaab1;
+}
+.gitlogcolumn {
+  background: #151516;
+}
+#commits {
+  padding-bottom: 20px;
+}
+.commit {
+  position: relative;
+  width: 100%;
+  min-height: 57px;
+  padding: 8px 10px 8px 36px;
+  display: grid !important;
+  grid-template-columns: 60px 78px minmax(0, 1fr) auto !important;
+  grid-template-rows: 20px 18px;
+  gap: 0 9px;
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid #2c2c2f;
+  background: transparent;
+  color: #d8d8dc;
+  text-align: left;
+  cursor: pointer;
+}
+.commit:hover,
+.commit.selected {
+  background: #202022;
+}
+.commit.selected {
+  box-shadow: inset 3px 0 var(--bash-pink);
+}
+.commitgraph {
+  position: absolute;
+  left: 17px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #3d3d42;
+}
+.commitgraph i {
+  position: absolute;
+  left: -4px;
+  top: 22px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #f35bae;
+  border-radius: 50%;
+  background: #171719;
+}
+.commit code {
+  grid-row: 1;
+  padding: 3px 5px;
+  border-radius: 5px;
+  background: #302537;
+  color: #f467b8;
+  font:
+    9px ui-monospace,
+    monospace;
+}
+.commit > span:not(.commitgraph) {
+  grid-row: 1;
+  color: #85858c;
+  font: 9px Arial;
+}
+.commit b {
+  grid-row: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 600 11px Arial;
+  white-space: nowrap;
+}
+.commit small {
+  grid-row: 2;
+  grid-column: 3;
+  color: #77777e;
+  font: 9px Arial;
+}
+.commit em {
+  grid-row: 2;
+  grid-column: 1;
+  width: max-content;
+  padding: 2px 5px;
+  border-radius: 7px;
+  background: #273624;
+  color: #7be960;
+  font: 800 7px Arial;
+  font-style: normal;
+}
+.commitdetail {
+  border-right: 0;
+  background: #1b1b1d;
+}
+.gitempty {
+  padding: 22px;
+  color: #727279;
+  font: 11px Arial;
+}
+.commitdetailhead {
+  padding: 14px;
+  border-bottom: 1px solid #303033;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.commitdetailhead code {
+  width: max-content;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: #302537;
+  color: #f467b8;
+  font-size: 9px;
+}
+.commitdetailhead b {
+  font: 650 13px/1.35 Arial;
+}
+.commitdetail dl {
+  display: grid;
+  grid-template-columns: 65px minmax(0, 1fr);
+  gap: 8px;
+  padding: 13px 14px;
+  margin: 0;
+}
+.commitdetail dt {
+  color: #77777e;
+  font: 9px Arial;
+}
+.commitdetail dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #c4c4c9;
+  font: 10px Arial;
+}
+.commitdetail h3 {
+  margin: 0;
+  padding: 10px 14px;
+  border-top: 1px solid #303033;
+  color: #7f7f86;
+  font: 800 8px Arial;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.commitmessage {
+  padding: 0 14px 14px;
+  white-space: pre-wrap;
+  color: #d7d7db;
+  font: 11px/1.5 Arial;
+}
+.commitfiles > div {
+  padding: 6px 14px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 6px;
+  border-top: 1px solid #29292c;
+  font:
+    10px ui-monospace,
+    monospace;
+}
+.commitfiles code {
+  color: #66dfd6;
+}
+.commitfiles span {
+  overflow-wrap: anywhere;
+  color: #b8b8bd;
+}
+@media (max-width: 900px) {
+  .gitgrid {
+    grid-template-columns: 220px minmax(0, 1fr) !important;
+  }
+  .commitdetail {
+    display: none;
+  }
+  .latestcommit {
+    grid-template-columns: 45px 65px minmax(0, 1fr);
+  }
+  .latestcommit small {
+    display: none;
+  }
+}
+@media (max-width: 650px) {
+  #git {
+    grid-template-rows: 50px 58px minmax(0, 1fr);
+  }
+  .gitproject {
+    min-width: 0;
+    flex: 1;
+  }
+  .githead .gitsync {
+    display: none;
+  }
+  .githead #refreshGit {
+    margin-left: 0;
+  }
+  .latestcommit {
+    grid-template-columns: 55px minmax(0, 1fr);
+  }
+  .latestcommit span,
+  .latestcommit small {
+    display: none;
+  }
+  .gitgrid {
+    grid-template-columns: 1fr !important;
+  }
+  .gitcolumn:first-child {
+    display: none;
+  }
+  .commit {
+    grid-template-columns: 58px 68px minmax(0, 1fr) !important;
+  }
+  .gitprojectmenu {
+    width: calc(100vw - 20px);
+  }
+}

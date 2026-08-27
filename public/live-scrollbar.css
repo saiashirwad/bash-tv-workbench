@@ -1,0 +1,65 @@
+/* The Live message rail is the only visible scrollbar/minimap. */
+#session .conversation {
+  padding-right: 25px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+#session .conversation::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+#session .conversationwrap {
+  isolation: isolate;
+}
+#session .sessiontimeline {
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  padding: 5px 0;
+  background: #18181a;
+  border-left: 1px solid #303033;
+}
+#session .sessiontimeline:before {
+  left: 11px;
+  top: 7px;
+  bottom: 7px;
+}
+#session .timelinedot:before {
+  left: 11px;
+}
+#session .timelinedot:hover:before,
+#session .timelinedot:focus-visible:before {
+  left: 4px;
+}
+#session .timelinedot.active:before {
+  left: 6px;
+}
+#session .timelinepreview {
+  right: 25px;
+}
+@media (max-width: 750px) {
+  #session .conversation {
+    padding-right: 23px;
+  }
+  #session .sessiontimeline {
+    width: 22px;
+  }
+  #session .sessiontimeline:before {
+    left: 10px;
+  }
+  #session .timelinedot:before {
+    left: 10px;
+  }
+  #session .timelinedot:hover:before,
+  #session .timelinedot:focus-visible:before {
+    left: 3px;
+  }
+  #session .timelinedot.active:before {
+    left: 5px;
+  }
+  #session .timelinepreview {
+    right: 23px;
+  }
+}

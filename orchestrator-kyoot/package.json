@@ -1,0 +1,21 @@
+{
+  "name": "bash-workbench-kyoot-orchestrator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.ts",
+    "check": "npm run typecheck && npm run test"
+  },
+  "dependencies": {
+    "@kyoot/pi": "*",
+    "@kyoot/rpc": "*",
+    "@kyoot/sync": "*",
+    "@kyoot/workbench-protocol": "*",
+    "kyoot": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,94 @@
+.brand {
+  min-width: 230px;
+  gap: 7px;
+  user-select: none;
+}
+.bashface {
+  position: relative;
+  width: 34px;
+  height: 32px;
+  flex: 0 0 34px;
+  display: block;
+  overflow: hidden;
+  border-radius: 1px;
+  background: #19d34b;
+}
+.bashface i {
+  position: absolute;
+  top: 9px;
+  width: 4px;
+  height: 8px;
+  border-radius: 1px;
+  background: #08160d;
+}
+.bashface i:first-child { left: 10px; }
+.bashface i:nth-child(2) { right: 10px; }
+.bashface em {
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  bottom: 7px;
+  height: 4px;
+  border-radius: 1px;
+  background: #08160d;
+}
+.brand b {
+  position: relative;
+  display: flex;
+  align-items: center;
+  color: #f7f7f8;
+  font-family: Impact, "Arial Black", Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -.055em;
+  white-space: nowrap;
+}
+.brandbash {
+  transform: scaleY(1.08);
+  transform-origin: left center;
+  text-shadow: 1px 0 #f7f7f8;
+}
+.brandtv {
+  margin-left: 2px;
+  padding: 2px 4px 1px;
+  background: #d47cf0;
+  color: #32133d;
+  font-size: 9px;
+  line-height: 11px;
+  letter-spacing: -.03em;
+  transform: rotate(-9deg) translateY(1px);
+  box-shadow: 2px 1px 0 #8066ff;
+}
+.branddivider {
+  width: 1px;
+  height: 19px;
+  margin: 0 8px;
+  background: #39383d;
+}
+.brandworkbench {
+  color: #aaa8b0;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .115em;
+}
+.brand:hover .bashface { background: #27e158; }
+.brand:hover .brandtv { transform: rotate(2deg) translateY(1px); }
+@media (max-width: 1050px) {
+  .brand { min-width: auto; }
+  .brand b { font-size: 19px; }
+  .brandworkbench, .branddivider { display: none; }
+}
+@media (max-width: 760px) {
+  .brand b { display: none; }
+  .bashface { width: 29px; height: 28px; flex-basis: 29px; }
+  .bashface i { top: 8px; height: 7px; }
+  .bashface i:first-child { left: 8px; }
+  .bashface i:nth-child(2) { right: 8px; }
+  .bashface em { left: 7px; right: 7px; bottom: 6px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bashface { transition: background .12s ease; }
+  .brandtv { transition: transform .14s ease; }
+}

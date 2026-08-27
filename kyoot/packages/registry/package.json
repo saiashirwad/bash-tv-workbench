@@ -1,0 +1,21 @@
+{
+  "name": "@kyoot/registry",
+  "version": "0.1.0",
+  "description": "Components that load, unload, and hot swap on top of kyoot effects",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "kyoot": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2"
+  }
+}

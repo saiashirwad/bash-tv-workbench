@@ -1,0 +1,6 @@
+node_modules/
+kyoot/node_modules/
+kyoot/packages/*/node_modules/
+orchestrator-kyoot/node_modules/
+.state/
+*.log

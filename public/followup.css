@@ -1,0 +1,227 @@
+/* User turns are findable; composer is a true bottom dock. */
+.promptblock,
+.followupbubble {
+  width: fit-content;
+  max-width: min(760px, 88%);
+  border-radius: 13px;
+  background: #161618 !important;
+  box-shadow: inset 0 0 0 1px #2d2d30;
+}
+.promptblock {
+  margin: 12px 24px 8px;
+  padding: 13px 15px;
+}
+.followupuser {
+  padding: 14px 0 8px;
+}
+.followupbubble {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  color: #dedee2;
+  font:
+    14px/1.55 Arial,
+    Helvetica,
+    sans-serif;
+  white-space: pre-wrap;
+}
+.promptblock .runavatar.prompt,
+.followupbubble .runavatar.prompt {
+  display: grid !important;
+  place-items: center;
+  width: 25px !important;
+  height: 25px !important;
+  min-width: 25px !important;
+  min-height: 25px !important;
+  max-width: 25px !important;
+  max-height: 25px !important;
+  flex: 0 0 25px !important;
+  border-radius: 50%;
+  object-fit: cover;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    var(--bash-pink),
+    var(--bash-purple),
+    var(--bash-cyan)
+  );
+  color: #fff;
+  font:
+    800 9px/25px Arial,
+    Helvetica,
+    sans-serif;
+  text-align: center;
+}
+.promptblock > div,
+.followupbubble > div {
+  min-width: 0;
+  padding-top: 1px;
+}
+.agentdetail {
+  padding: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+.agenttranscript {
+  min-height: 0;
+  overflow: auto;
+  background: #1d1d1f;
+}
+.agenttranscript > .taskhead {
+  display: none;
+}
+.agenttranscript > .timeline {
+  padding-bottom: 28px;
+}
+.followupcomposer {
+  grid-row: 2;
+  position: relative;
+  z-index: 7;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid #343438;
+  background: #18181a;
+  backdrop-filter: none;
+}
+.followupmeta {
+  height: 30px;
+  padding: 0 15px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  color: #74747a;
+  font:
+    9px Arial,
+    Helvetica,
+    sans-serif;
+}
+.followupmeta span + span {
+  padding-left: 13px;
+  border-left: 1px solid #333336;
+}
+.followupmeta .compactrun {
+  margin-left: auto;
+  width: auto;
+  height: auto;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 8px;
+  background: #29292c;
+  color: #a5a5ab;
+  font:
+    700 8px Arial,
+    Helvetica,
+    sans-serif;
+}
+.followupmeta .compactrun:hover:not(:disabled) {
+  background: #343438;
+  color: #fff;
+}
+.followupinput {
+  padding: 0 12px 11px;
+  display: flex;
+  align-items: flex-end;
+  gap: 9px;
+}
+.followupcomposer textarea {
+  flex: 1;
+  min-height: 64px;
+  max-height: 170px;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1px solid #3b3b3f;
+  border-radius: 13px;
+  outline: 0;
+  background: #242426;
+  color: #f0f0f2;
+  font:
+    14px/1.45 Arial,
+    Helvetica,
+    sans-serif;
+}
+.followupcomposer textarea:focus {
+  border-color: #58d86a;
+}
+.followupcomposer textarea::placeholder {
+  color: #74747a;
+}
+.followupcomposer textarea:disabled {
+  opacity: 0.55;
+}
+.followupinput > button {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  margin-bottom: 1px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: #31df55;
+  color: #0b160d;
+  cursor: pointer;
+}
+.followupinput > button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.followupcomposer svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.compactionevent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #a9a9af;
+  font:
+    11px Arial,
+    Helvetica,
+    sans-serif;
+}
+.compactionevent:before {
+  content: "↘";
+  color: #b991ff;
+}
+.compactionevent small {
+  color: #707077;
+}
+@media (max-width: 600px) {
+  .promptblock {
+    margin: 8px 12px;
+    padding: 11px 12px;
+  }
+  .followupbubble {
+    max-width: 94%;
+    padding: 11px 12px;
+    font-size: 13px;
+  }
+  .agenttranscript > .timeline {
+    padding-bottom: 20px;
+  }
+  .followupmeta {
+    gap: 8px;
+    padding: 0 10px;
+  }
+  .followupmeta span:nth-child(3) {
+    display: none;
+  }
+  .followupinput {
+    padding: 0 8px 8px;
+  }
+  .followupcomposer textarea {
+    min-height: 56px;
+    font-size: 13px;
+  }
+  .followupinput > button {
+    width: 40px;
+    height: 40px;
+  }
+}

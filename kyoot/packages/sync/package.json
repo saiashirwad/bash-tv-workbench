@@ -1,0 +1,26 @@
+{
+  "name": "@kyoot/sync",
+  "version": "0.1.0",
+  "description": "Server-authoritative revision sync for typed Kyoot clients",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./query": "./src/query.ts",
+    "./rpc": "./src/rpc.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@kyoot/rpc": "*",
+    "@kyoot/schema": "*",
+    "kyoot": "*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2"
+  }
+}

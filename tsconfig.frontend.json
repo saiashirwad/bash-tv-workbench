@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "/files.js": ["frontend/files.ts"]
+    }
+  },
+  "include": [
+    "frontend/app.ts",
+    "frontend/auth.ts",
+    "frontend/dom.ts",
+    "frontend/files.ts",
+    "frontend/git.ts",
+    "frontend/live-chat.ts",
+    "frontend/query-cache.ts",
+    "frontend/runs.ts",
+    "frontend/trajectory.ts",
+    "frontend/workflows.ts",
+    "frontend/browser-modules.d.ts",
+    "frontend/lazy-modules.d.ts",
+    "editor-entry.ts",
+    "markdown-entry.ts"
+  ]
+}

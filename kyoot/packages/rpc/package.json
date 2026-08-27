@@ -1,0 +1,25 @@
+{
+  "name": "@kyoot/rpc",
+  "version": "0.1.0",
+  "description": "Transport-neutral typed RPC for Kyoot",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./http": "./src/http.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@kyoot/schema": "*",
+    "kyoot": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2",
+    "zod": "^4.4.3"
+  }
+}

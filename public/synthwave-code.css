@@ -1,0 +1,105 @@
+/* Restrained synthwave tokens, shared by previews and Markdown code. */
+.toolcode,
+.toolcode pre,
+.messageevent .markdown .codeblock,
+.messageevent .markdown .codeblock pre {
+  background: #0c1017 !important;
+}
+.toolcode .lineno {
+  background: #0c1017;
+  color: #54596b;
+}
+.toolcode code,
+.messageevent .markdown .hljs {
+  color: #e8e8ee;
+  background: #0c1017 !important;
+}
+.toolcode .hljs-keyword,
+.toolcode .hljs-selector-tag,
+.toolcode .hljs-literal,
+.toolcode .hljs-doctag,
+.messageevent .markdown .hljs-keyword,
+.messageevent .markdown .hljs-selector-tag,
+.messageevent .markdown .hljs-literal,
+.messageevent .markdown .hljs-doctag {
+  color: #ff5db1;
+}
+.toolcode .hljs-string,
+.toolcode .hljs-regexp,
+.toolcode .hljs-attribute,
+.messageevent .markdown .hljs-string,
+.messageevent .markdown .hljs-regexp,
+.messageevent .markdown .hljs-attribute {
+  color: #a9ed70;
+}
+.toolcode .hljs-number,
+.toolcode .hljs-built_in,
+.toolcode .hljs-type,
+.messageevent .markdown .hljs-number,
+.messageevent .markdown .hljs-built_in,
+.messageevent .markdown .hljs-type {
+  color: #ffae57;
+}
+.toolcode .hljs-title,
+.toolcode .hljs-title.function_,
+.toolcode .hljs-section,
+.messageevent .markdown .hljs-title,
+.messageevent .markdown .hljs-title.function_,
+.messageevent .markdown .hljs-section {
+  color: #35d9ff;
+}
+.toolcode .hljs-variable,
+.toolcode .hljs-template-variable,
+.toolcode .hljs-property,
+.toolcode .hljs-params,
+.messageevent .markdown .hljs-variable,
+.messageevent .markdown .hljs-template-variable,
+.messageevent .markdown .hljs-property,
+.messageevent .markdown .hljs-params {
+  color: #b991ff;
+}
+.toolcode .hljs-meta,
+.toolcode .hljs-symbol,
+.toolcode .hljs-bullet,
+.messageevent .markdown .hljs-meta,
+.messageevent .markdown .hljs-symbol,
+.messageevent .markdown .hljs-bullet {
+  color: #43e8d8;
+}
+.toolcode .hljs-comment,
+.toolcode .hljs-quote,
+.messageevent .markdown .hljs-comment,
+.messageevent .markdown .hljs-quote {
+  color: #777b8c;
+  font-style: italic;
+}
+.toolcode .hljs-attr,
+.toolcode .hljs-name,
+.messageevent .markdown .hljs-attr,
+.messageevent .markdown .hljs-name {
+  color: #ff8fcb;
+}
+.messageevent .markdown .codelabel {
+  color: #ff5db1;
+  background: #10151f;
+  border-color: #292e3b;
+}
+.diffcode .codeline.add .lineno,
+.diffcode .codeline.add code {
+  background: #123322 !important;
+}
+.diffcode .codeline.del .lineno,
+.diffcode .codeline.del code {
+  background: #391c2a !important;
+}
+.diffcode .codeline.add code {
+  color: #a9ed70;
+}
+.diffcode .codeline.del code {
+  color: #ff7592;
+}
+.diffcode .codeline.hunk .lineno,
+.diffcode .codeline.hunk code {
+  background: #211d32 !important;
+  color: #b991ff;
+}

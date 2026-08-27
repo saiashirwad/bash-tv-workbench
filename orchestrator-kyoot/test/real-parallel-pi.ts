@@ -1,0 +1,16 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { Async, Emit, Fail, Kyoot } from "kyoot";
+import { Pi } from "@kyoot/pi";
+import { service } from "@kyoot/pi/node";
+const workbenchRoot = fileURLToPath(new URL("../..", import.meta.url));
+const kyootRoot = path.join(workbenchRoot, "kyoot");
+const allowed=["HOME","PATH","LANG","TERM","TMPDIR","API_REFRESH_TOKEN","BASHTV_FREE_LLM_URL","BASHTV_FREE_MODEL_INFO","BASHTV_TUNNEL_AUTH_TOKEN","VERCEL_AUTOMATION_BYPASS_SECRET"];
+const environment=()=>{let source={...process.env};try{const raw=fs.readFileSync(`/proc/${process.env.BASH_WORKBENCH_PLATFORM_PID}/environ`,"utf8");source={...source,...Object.fromEntries(raw.split("\0").filter(Boolean).map(e=>{const i=e.indexOf("=");return[e.slice(0,i),e.slice(i+1)]}))}}catch{}return Object.fromEntries(allowed.flatMap(k=>source[k]==null?[]:[[k,source[k]]])) as Record<string,string>};
+const pi=service({cliPath:"/opt/pi-mono/packages/coding-agent/dist/cli.js",providerExtension:path.join(workbenchRoot,"child-provider.mjs"),environment,terminateGraceMs:2000});
+const turn=(name:string)=>Pi.scoped({cwd:kyootRoot,sessionDir:`/tmp/kyoot-parallel-${name}`,provider:"bashtv",model:"free",thinking:"low"},session=>Pi.runTurn(session,`Read-only parallel integration check. Do not edit files. Reply with exactly ${name}.`)).pipe(Emit.discard);
+const started=Date.now();
+const results=await Kyoot.runPromise(Async.all([turn("PARALLEL_A"),turn("PARALLEL_B")],{concurrency:2}).pipe(Pi.Service.provide(pi),Fail.orThrow));
+const texts=results.map(result=>{const m=(result.messages as any[])?.findLast?.(x=>x?.role==="assistant");return m?.content?.filter((x:any)=>x?.type==="text").map((x:any)=>x.text).join("\n")||""});
+console.log(JSON.stringify({elapsedMs:Date.now()-started,texts}));

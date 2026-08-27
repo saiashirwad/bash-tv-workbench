@@ -1,8 +1,3 @@
-# One-prompt Bash.tv Space Setup
-
-Paste the prompt below into a new Bash.tv coding-agent session.
-
-````text
 Start the latest Bash Workbench from this repository:
 
 https://github.com/saiashirwad/bash-tv-workbench.git
@@ -29,6 +24,7 @@ Bash Workbench is a separate development tool. It must run in the background whi
    ```
 
    Do not use `&`, `nohup`, or systemd. Use the default experimental open-access mode. Do not set `BASH_WORKBENCH_AUTH_REQUIRED`.
+
 6. Run `$HOME/.local/bin/bw status --wait`. This command waits until `http://127.0.0.1:8010/api/health` reports `ok: true`, or exits after 60 seconds. Do not run other CLI commands during setup.
 7. Call `open_preview` for port `8010`.
 8. If the user has already given you a project to build, continue with that request after setup:
@@ -55,4 +51,3 @@ Do not use browser automation. Do not click through the Workbench. Do not test f
 For later build requests, first create the user project outside `/home/bashtv/workbench`, then register it with `$HOME/.local/bin/bw projects register`. Use `$HOME/.local/bin/bw` instead of custom HTTP requests or scripts. Use `runs batch` for independent parallel tasks, and use `runs list`, `runs get`, or `runs wait` to check their status. Use workflows only when tasks have dependencies.
 
 Never inspect, print, copy, or save Bash.tv credentials or entitlement values. Do not modify Bash.tv platform services or internal files. Leave ports `7890`, `8012`, and `8020` unchanged.
-````

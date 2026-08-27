@@ -35,9 +35,9 @@ Global options:
   --raw                 Print a command's primary text value
 
 Core commands:
-  status
+  status [--wait]
   projects list
-  runs list|get|create|message|stop|compact|events|watch|wait
+  runs list|get|create|batch|message|stop|compact|events|watch|wait
   workflows list|get|create|add-tasks|cancel|cancel-task|retry-task|events|wait
   trajectory list|get
   live info|messages
@@ -66,6 +66,52 @@ Examples:
 Use '-' as a file name to read JSON or text from stdin.
 `;
 
+const COMMAND_HELP = {
+  status: `Usage: bash-workbench status [--wait] [--wait-timeout MS] [--interval MS]\n\nCheck Workbench health. --wait retries until the server is ready.\n`,
+  runs: `Usage: bash-workbench runs <list|create|batch|get|message|stop|compact|events|watch|wait> [options]\n\nUse "bash-workbench runs <command> --help" for command details.\n`,
+  "runs create": `Usage: bash-workbench runs create [--project ID] (--prompt TEXT | --prompt-file FILE) [--title TEXT]\n\nCreate one agent run. The first registered project is used when --project is omitted.\n`,
+  "runs batch": `Usage: bash-workbench runs batch (--input JSON | --file FILE) [--project ID] [--concurrency N] [--full]\n\nCreate up to 50 independent agent runs. Input is an array or an object with a runs array. Calls run concurrently.\n`,
+  workflows: `Usage: bash-workbench workflows <list|create|get|add-tasks|cancel|cancel-task|retry-task|events|wait> [options]\n\nUse --file, --input, or stdin for workflow JSON.\n`,
+  "workflows create": `Usage: bash-workbench workflows create (--input JSON | --file FILE)\n\nCreate a durable workflow. See CLI.md for the task schema.\n`,
+  files: `Usage: bash-workbench files <tree|read|write|search|grep|patch> [options]\n`,
+  fs: `Usage: bash-workbench fs <mkdir|copy|move|rename|delete|chmod|symlink> [options]\n`,
+  git: `Usage: bash-workbench git <status|log|diff|stage|commit|branch|fetch|pull|push> [options]\n`,
+  process: `Usage: bash-workbench process <list|start|read|follow|write|stop> [options]\n`,
+  artifact: `Usage: bash-workbench artifact <list|export|download|delete|import> [options]\n`,
+  snapshot: `Usage: bash-workbench snapshot <list|create|restore> [options]\n`,
+  trajectory: `Usage: bash-workbench trajectory <list|get> [options]\n`,
+  live: `Usage: bash-workbench live <info|messages> [options]\n`,
+  vm: `Usage: bash-workbench vm <info|ports|ps> [options]\n`,
+  op: `Usage: bash-workbench op <list|describe|call> [options]\n`,
+  rpc: `Usage: bash-workbench rpc PROCEDURE (--input JSON | --file FILE)\n`,
+  exec: `Usage: bash-workbench exec [--project ID] [--cwd PATH] -- COMMAND [ARGS...]\n`,
+};
+
+const helpFor = (group, action) =>
+  `Bash Workbench CLI ${VERSION}\n\n${COMMAND_HELP[[group, action].filter(Boolean).join(" ")] || COMMAND_HELP[group] || HELP}`;
+
+const BOOLEAN_OPTIONS = new Set([
+  "allow-failure",
+  "cached",
+  "compact",
+  "confirm",
+  "create",
+  "dry-run",
+  "events",
+  "force",
+  "full",
+  "help",
+  "include-git",
+  "include-ignored",
+  "no-auth",
+  "overwrite",
+  "raw",
+  "recursive",
+  "regex",
+  "version",
+  "wait",
+]);
+
 const splitArguments = (argv) => {
   const options = new Map();
   const positional = [];
@@ -84,7 +130,13 @@ const splitArguments = (argv) => {
     const key = item.slice(2, equal < 0 ? undefined : equal);
     const next = equal >= 0 ? item.slice(equal + 1) : argv[index + 1];
     const value =
-      equal >= 0 || (next != null && !next.startsWith("--")) ? next : true;
+      equal >= 0
+        ? next
+        : BOOLEAN_OPTIONS.has(key)
+          ? true
+          : next != null && !next.startsWith("--")
+            ? next
+            : true;
     if (equal < 0 && value !== true) index++;
     const previous = options.get(key);
     options.set(
@@ -165,9 +217,9 @@ class WorkbenchClient {
     };
   }
 
-  async request(url, init = {}) {
+  async request(url, init = {}, timeoutMs = this.timeoutMs) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetch(`${this.url}${url}`, {
         ...init,
@@ -282,8 +334,55 @@ const project = async () => {
 };
 const confirmation = () => flag("confirm");
 const statusList = () => strings("status");
+const conciseRun = ({ id, project, title, status }) => ({
+  id,
+  project,
+  title,
+  status,
+});
+const mapConcurrent = async (items, concurrency, visit) => {
+  const results = new Array(items.length);
+  let next = 0;
+  const workers = Array.from(
+    { length: Math.min(items.length, concurrency) },
+    async () => {
+      while (next < items.length) {
+        const index = next++;
+        results[index] = await visit(items[index], index);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
+};
 
-const runCommand = async (group, action) => {
+const healthCommand = async () => {
+  if (!flag("wait"))
+    return client.request("/api/health", { headers: client.headers(false) });
+  const deadline = Date.now() + number("wait-timeout", 60_000);
+  let lastError;
+  while (Date.now() < deadline) {
+    try {
+      const health = await client.request(
+        "/api/health",
+        { headers: client.headers(false) },
+        Math.min(2_000, Math.max(1, deadline - Date.now())),
+      );
+      if (health?.ok === true) return health;
+      lastError = new Error("health did not report ok: true");
+    } catch (error) {
+      lastError = error;
+    }
+    await sleep(
+      Math.min(number("interval", 500), Math.max(0, deadline - Date.now())),
+    );
+  }
+  throw new Error(
+    `Workbench was not ready within ${number("wait-timeout", 60_000)}ms${lastError?.message ? `: ${lastError.message}` : ""}`,
+  );
+};
+
+const runCommand = async (action) => {
   if (action === "list") {
     let runs = await client.rpc("runs.list", {});
     const statuses = statusList();
@@ -302,6 +401,32 @@ const runCommand = async (group, action) => {
       prompt: String(prompt),
       ...(option("title") ? { title: String(option("title")) } : {}),
     });
+  }
+  if (action === "batch") {
+    const input = await jsonInput();
+    const tasks = Array.isArray(input) ? input : input.runs;
+    if (!Array.isArray(tasks) || tasks.length === 0)
+      throw new Error("Batch input must contain at least one run");
+    if (tasks.length > 50) throw new Error("Batch input cannot exceed 50 runs");
+    const fallbackProject = tasks.some((task) => !task?.project)
+      ? await project()
+      : null;
+    const created = await mapConcurrent(
+      tasks,
+      Math.max(1, Math.min(25, number("concurrency", 10))),
+      (task, index) => {
+        if (!task || typeof task !== "object")
+          throw new Error(`Run ${index + 1} must be an object`);
+        if (typeof task.prompt !== "string" || !task.prompt.trim())
+          throw new Error(`Run ${index + 1} requires a prompt`);
+        return client.rpc("runs.create", {
+          project: String(task.project || fallbackProject),
+          prompt: task.prompt,
+          ...(task.title ? { title: String(task.title) } : {}),
+        });
+      },
+    );
+    return flag("full") ? created : created.map(conciseRun);
   }
   const id = first(2, "run ID");
   if (action === "get") {
@@ -638,13 +763,13 @@ const snapshotCommand = async (action) => {
 
 async function dispatch() {
   const [group, action] = parsed.positional;
-  if (!group || group === "help" || flag("help")) return { help: HELP };
-  if (group === "version") return { version: VERSION };
-  if (group === "status")
-    return client.request("/api/health", { headers: client.headers(false) });
+  if (flag("version") || group === "version") return { version: VERSION };
+  if (!group || group === "help") return { help: HELP };
+  if (flag("help")) return { help: helpFor(group, action) };
+  if (group === "status") return healthCommand();
   if (group === "projects" && action === "list")
     return client.rpc("projects.list", {});
-  if (group === "runs") return runCommand(group, action || "list");
+  if (group === "runs") return runCommand(action || "list");
   if (group === "workflows") return workflowCommand(action || "list");
   if (group === "trajectory") {
     if (action === "list")

@@ -6,8 +6,9 @@ Everything required to build and run the application lives in this directory:
 
 ```text
 frontend/     maintained TypeScript browser source
-public/       generated browser-native deployment assets
-server.mjs    production HTTP entrypoint
+public/          committed browser-native deployment assets
+typed-server.mjs committed typed backend bundle
+server.mjs       production HTTP entrypoint
 ```
 
 No sibling checkout is required. All build and runtime source is in this repository.
@@ -55,7 +56,7 @@ To restore the protected owner/collaborator boundary, start with `BASH_WORKBENCH
 ```bash
 bash ./bootstrap.sh doctor          # verify Bash.tv Pi; install mise and Node if needed; check repository completeness
 bash ./bootstrap.sh plan            # print exact paths, port, concurrency, and state location
-bash ./bootstrap.sh install         # install in place, build, and provision private state
+bash ./bootstrap.sh install         # install dependencies, state, and the agent CLI
 bash ./bootstrap.sh serve           # foreground production runtime for a detached/tmux agent job
 bash ./bootstrap.sh verify          # health, self-registration, archive, and confinement checks
 bash ./bootstrap.sh verify --live   # additionally execute one bounded real bashtv/free turn
@@ -69,20 +70,27 @@ The browser UI exposes typed Workbench queries and mutations as browser-native W
 ## Agent CLI
 
 `bootstrap.sh install` adds `bash-workbench` and the short `bw` alias to
-`$HOME/.local/bin`. The CLI gives a Bash.tv coding agent direct control of
-runs, workflows, files, Git, managed processes, artifacts, snapshots, VM
-inspection, Live Trajectory, and every validated platform operation.
+`$HOME/.local/bin`. Bash.tv does not always add this directory to `PATH`, so
+agents must use the full `$HOME/.local/bin/bw` path. The CLI gives an agent
+direct control of runs, workflows, files, Git, managed processes, artifacts,
+snapshots, VM inspection, Live Trajectory, and every validated platform
+operation.
 
 ```bash
-bw status
-bw projects list
-bw runs create --project bash-workbench --prompt "Fix the failing build"
-bw runs watch RUN_ID
-bw exec --project bash-workbench -- npm test
-bw op list
+$HOME/.local/bin/bw status --wait
+$HOME/.local/bin/bw projects list
+$HOME/.local/bin/bw runs create --project bash-workbench --prompt "Fix the failing build"
+$HOME/.local/bin/bw runs batch --file parallel-runs.json --concurrency 2
+$HOME/.local/bin/bw runs watch RUN_ID
+$HOME/.local/bin/bw exec --project bash-workbench -- npm test
+$HOME/.local/bin/bw op list
 ```
 
 See [`CLI.md`](CLI.md) for the complete command interface.
+
+`public/` and `typed-server.mjs` are committed deployment assets. Normal setup
+uses these files directly and does not rebuild them. Developers run
+`npm run build` before they commit source changes.
 
 ## Development commands
 

@@ -105,13 +105,13 @@ try {
     input: "{}",
   });
   const result = outputText(invoked);
-  if (invoked.isError || !result.includes("kyoot-workbench"))
+  if (invoked.isError || !result.includes("bash-workbench"))
     throw new Error(`workbench_list_projects invocation failed:\n${result}`);
 
   for (const [toolName, input] of [
     ["workbench_spawn_agent", { project: "__verification_missing__", prompt: "do not run" }],
     ["workbench_spawn_workflow", { title: "verification", tasks: [{ id: "verify", project: "__verification_missing__", prompt: "do not run" }] }],
-    ["workbench_add_workflow_tasks", { workflowId: "__verification_missing__", tasks: [{ id: "verify", project: "kyoot-workbench", prompt: "do not run" }] }],
+    ["workbench_add_workflow_tasks", { workflowId: "__verification_missing__", tasks: [{ id: "verify", project: "bash-workbench", prompt: "do not run" }] }],
   ]) {
     const probe = await call("execute_webmcp_tool", { pageId, toolName, input: JSON.stringify(input) });
     const text = outputText(probe);
@@ -120,7 +120,7 @@ try {
   const execResult = await call("execute_webmcp_tool", {
     pageId,
     toolName: "workbench_exec",
-    input: JSON.stringify({ project: "kyoot-workbench", command: "printf WEBMCP_EXEC_READY" }),
+    input: JSON.stringify({ project: "bash-workbench", command: "printf WEBMCP_EXEC_READY" }),
   });
   if (execResult.isError || !outputText(execResult).includes("WEBMCP_EXEC_READY"))
     throw new Error(`workbench_exec invocation failed:\n${outputText(execResult)}`);
@@ -138,7 +138,7 @@ try {
     const created = await call("execute_webmcp_tool", {
       pageId: externalPageId,
       toolName: "workbench_spawn_agent",
-      input: JSON.stringify({ project: "kyoot-workbench", title, prompt: "Visibility acceptance task: report that the agent started, without modifying files." }),
+      input: JSON.stringify({ project: "bash-workbench", title, prompt: "Visibility acceptance task: report that the agent started, without modifying files." }),
     });
     if (created.isError) throw new Error(`Agent creation failed:\n${outputText(created)}`);
     let visible = "";

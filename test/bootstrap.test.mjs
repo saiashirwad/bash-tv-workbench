@@ -32,4 +32,33 @@ test("one-paste setup clones GitHub and keeps open experimental access", async (
   assert.match(prompt, /bash \.\/bootstrap\.sh install/);
   assert.match(prompt, /default experimental open-access mode/);
   assert.match(prompt, /Do not set `BASH_WORKBENCH_AUTH_REQUIRED`/);
+  assert.match(prompt, /\$HOME\/\.local\/bin\/bw status --wait/);
+  assert.doesNotMatch(prompt, /until .*grep/);
+});
+
+test("space installation uses committed deployment assets", async () => {
+  const source = await readFile(bootstrapPath, "utf8");
+  const install = source.slice(
+    source.indexOf("install() {"),
+    source.indexOf("serve() {"),
+  );
+  assert.match(install, /npm ci --omit=dev/);
+  assert.doesNotMatch(install, /npm run build/);
+  assert.match(install, /Bash Workbench installed/);
+  assert.doesNotMatch(install, /Kyoot Workbench/);
+});
+
+test("agent-facing setup files use the Bash Workbench identity", async () => {
+  const sources = await Promise.all(
+    [
+      "README.md",
+      "SETUP_PROMPT.md",
+      "AGENTS.md",
+      "orchestrator-kyoot/README.md",
+      "public/index.html",
+    ].map((file) => readFile(new URL(file, root), "utf8")),
+  );
+  for (const source of sources) {
+    assert.doesNotMatch(source, /kyoot/i);
+  }
 });

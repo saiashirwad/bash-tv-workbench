@@ -57,7 +57,7 @@ ensure_mise() {
   esac
 
   url="https://github.com/jdx/mise/releases/download/v${MISE_VERSION}/${asset}"
-  download="$(mktemp "${TMPDIR:-/tmp}/kyoot-workbench-mise.XXXXXX")"
+  download="$(mktemp "${TMPDIR:-/tmp}/bash-workbench-mise.XXXXXX")"
   info "Installing pinned mise v${MISE_VERSION} for $platform"
   if ! curl --fail --location --silent --show-error --retry 3 --connect-timeout 15 \
     --output "$download" "$url"; then
@@ -100,8 +100,8 @@ doctor() {
 plan() {
   doctor
   cat <<EOF
-Install/build root: $ROOT
-Self-registered project: kyoot-workbench -> $ROOT
+Install root: $ROOT
+Self-registered project: bash-workbench -> $ROOT
 Optional registry: $CONFIG_PATH
 Listen address: $HOST:$PORT
 Maximum active normal agents: $MAX_AGENTS
@@ -124,10 +124,10 @@ ensure_repository() {
   info "Initializing extracted archive as a local Git repository"
   chmod +x bootstrap.sh scripts/setup-space.sh
   git init -b main
-  git config user.name "Kyoot Workbench Setup"
+  git config user.name "Bash Workbench Setup"
   git config user.email "workbench@local.invalid"
   git add .
-  git commit -m "Initialize standalone Kyoot Workbench deployment"
+  git commit -m "Initialize standalone Bash Workbench deployment"
   ok "local Git repository initialized (no remote configured)"
 }
 
@@ -139,17 +139,17 @@ prepare_state() {
 install() {
   doctor
   ensure_repository
-  info "Installing the unified npm workspace"
-  "$MISE" exec -- npm ci
-  info "Building committed runtime assets"
-  "$MISE" exec -- npm run build
+  info "Installing runtime dependencies"
+  "$MISE" exec -- npm ci --omit=dev --no-audit --no-fund --loglevel=error
+  ok "Using committed deployment assets"
   prepare_state
   mkdir -p "$HOME/.local/bin"
   chmod +x bin/bash-workbench.mjs
   ln -sfn "$ROOT/bin/bash-workbench.mjs" "$HOME/.local/bin/bash-workbench"
   ln -sfn "$ROOT/bin/bash-workbench.mjs" "$HOME/.local/bin/bw"
-  ok "Kyoot Workbench installed in place at $ROOT"
+  ok "Bash Workbench installed in place at $ROOT"
   ok "Workbench CLI installed: $HOME/.local/bin/bash-workbench"
+  info "Use '$HOME/.local/bin/bw' for Workbench CLI commands in this Bash.tv session."
   chmod +x bootstrap.sh scripts/setup-space.sh
   info "Next: start 'bash ./bootstrap.sh serve' with the Bash.tv coding tool's detached/tmux mode."
 }
@@ -157,7 +157,7 @@ install() {
 serve() {
   [[ -f typed-server.mjs ]] || fail "generated assets are missing; run ./bootstrap.sh install first"
   prepare_state
-  info "Starting Kyoot Workbench on $HOST:$PORT from the current session environment"
+  info "Starting Bash Workbench on $HOST:$PORT from the current session environment"
   info "This command intentionally remains in the foreground; launch it with the agent's detached/tmux tool mode."
   exec env \
     HOST="$HOST" \
@@ -207,13 +207,13 @@ verify_server() {
   projects="$(rpc projects.list '{}')"
   PROJECTS="$projects" ROOT="$ROOT" node - <<'NODE' || fail "self-registered project does not match this repository"
 const projects = JSON.parse(process.env.PROJECTS);
-const own = projects.find((project) => project.id === "kyoot-workbench");
+const own = projects.find((project) => project.id === "bash-workbench");
 if (!own || own.root !== process.env.ROOT || !own.writable) process.exit(1);
 NODE
-  ok "kyoot-workbench self-registers at $ROOT"
+  ok "bash-workbench self-registers at $ROOT"
   tmp="$(mktemp)"
   trap 'rm -f "$tmp"' RETURN
-  curl -fsS -H "x-workbench-control: $(<.state/workflows-v1/control.token)" "http://127.0.0.1:$PORT/api/projects/kyoot-workbench/source.zip" -o "$tmp" \
+  curl -fsS -H "x-workbench-control: $(<.state/workflows-v1/control.token)" "http://127.0.0.1:$PORT/api/projects/bash-workbench/source.zip" -o "$tmp" \
     || fail "standalone source archive failed"
   ARCHIVE="$tmp" node --input-type=module <<'NODE' || fail "standalone archive is incomplete"
 import { execFileSync } from "node:child_process";
@@ -252,9 +252,9 @@ const call = async (procedure, input) => {
   return payload.output;
 };
 let run = await call("runs.create", {
-  project: "kyoot-workbench",
+  project: "bash-workbench",
   title: "SPACE_SETUP_PROBE",
-  prompt: "Do not use tools. Reply exactly KY OOT_WORKBENCH_READY without the space after KY.",
+  prompt: "Do not use tools. Reply exactly BASH_WORKBENCH_READY.",
 });
 const deadline = Date.now() + 60_000;
 while (Date.now() < deadline) {
@@ -262,12 +262,12 @@ while (Date.now() < deadline) {
   if (["completed", "failed", "stopped"].includes(run.status)) break;
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
-if (run.status !== "completed" || !run.output?.includes("KYOOT_WORKBENCH_READY")) {
+if (run.status !== "completed" || !run.output?.includes("BASH_WORKBENCH_READY")) {
   console.error(JSON.stringify({ id: run.id, status: run.status, error: run.error }));
   process.exit(1);
 }
 if (run.cwd !== process.env.ROOT || !run.sessionDir?.startsWith(`${process.env.ROOT}/.state/`)) process.exit(1);
-console.log(`[ok] real Pi run ${run.id}: KYOOT_WORKBENCH_READY`);
+console.log(`[ok] real Pi run ${run.id}: BASH_WORKBENCH_READY`);
 NODE
   sleep 1
   if ps -eo args | grep '/opt/pi-mono/packages/coding-agent/dist/cli.js' | grep "$ROOT" | grep -v grep >/dev/null; then
@@ -285,8 +285,8 @@ verify() {
 archive() {
   command -v git >/dev/null 2>&1 || fail "git is required"
   git rev-parse --show-toplevel >/dev/null 2>&1 || fail "this checkout is not a Git repository"
-  local output="${2:-$(dirname "$ROOT")/kyoot-workbench-standalone.zip}"
-  git archive --format=zip --prefix=kyoot-workbench/ -o "$output" HEAD
+  local output="${2:-$(dirname "$ROOT")/bash-workbench-standalone.zip}"
+  git archive --format=zip --prefix=bash-workbench/ -o "$output" HEAD
   ok "wrote $output"
 }
 

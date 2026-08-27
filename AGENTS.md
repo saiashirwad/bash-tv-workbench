@@ -1,6 +1,6 @@
-# Kyoot Workbench Agent Guide
+# Bash Workbench Agent Guide
 
-This repository is the complete deployable Kyoot Workbench. It includes the application, generated runtime assets, durable orchestrator, and all Kyoot source under `kyoot/`. It must remain copyable without a sibling Kyoot checkout or any fixed installation path.
+This repository is the complete deployable Bash Workbench. It includes the application, generated runtime assets, durable orchestrator, and all internal runtime source. It must remain copyable without a sibling checkout or any fixed installation path.
 
 ## Setup contract
 
@@ -21,8 +21,8 @@ This repository is the complete deployable Kyoot Workbench. It includes the appl
 
 ## Architecture rules
 
-- Kyoot is the sole normal-run and workflow process engine.
-- `@kyoot/pi` owns Workbench coding sessions; `@kyoot/ai-pi` remains a lower-level raw model integration.
+- The bundled runtime is the sole normal-run and workflow process engine.
+- The high-level agent package owns Workbench coding sessions. The raw model integration remains a lower-level component.
 - Keep compact normalized collections in sync; files, search, Git, binary media, archives, and raw previews remain on-demand queries/endpoints.
 - Optimistic projections and rollback belong in `WorkbenchStore`, not UI components.
 - Keep the frontend vanilla TypeScript/Page.js and commit generated browser-native ESM.

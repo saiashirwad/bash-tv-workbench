@@ -18301,7 +18301,7 @@ var requireProject = (projects, id2) => {
 };
 var kyootBackend = (services, runs, invokePlatform) => ({
   listRuns: async () => (await runs.list()).map((run4) => publicRunSummary(run4, services.projects)),
-  listProjects: async () => [...services.projects.values()].map(({ id: id2, name, root }) => ({
+  listProjects: async () => [...services.projects.values()].filter((project) => !project.hidden).map(({ id: id2, name, root }) => ({
     id: id2,
     name,
     root,

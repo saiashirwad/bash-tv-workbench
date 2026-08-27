@@ -1,13 +1,13 @@
-# Kyoot Workbench orchestrator
+# Bash Workbench orchestrator
 
-The sole production process engine for the live Workbench on `8010`. Normal agents and dynamic workflow tasks both execute through `@kyoot/pi`; there is no supervisor socket or legacy process-engine fallback.
+The sole production process engine for the live Workbench on `8010`. Normal agents and dynamic workflow tasks both use the bundled agent runtime. There is no supervisor socket or legacy process-engine fallback.
 
 ## Runtime guarantees
 
 - Durable, versioned run records and restart recovery
 - Atomic and serialized persistence
 - Persistent bounded worker queue
-- Multiple concurrent Pi RPC sessions through `@kyoot/pi`
+- Multiple concurrent Pi RPC sessions through the bundled agent runtime
 - Per-run follow-up and compaction admission locks
 - Structured cancellation and process-group cleanup
 - Direct typed RPC and revision-sync publication
@@ -23,7 +23,7 @@ The parent Workbench pins Node through its root `mise.toml` and installs this pa
 cd ..
 ~/.local/bin/mise install
 ~/.local/bin/mise exec -- npm ci
-~/.local/bin/mise exec -- npm --prefix orchestrator-kyoot run check
+mise exec -- npm run check:all
 ```
 
 `test/real-parallel-pi.ts` and `test/manual-five-agents.ts` are explicit integration probes, not part of the ordinary test suite. They require the active Bash.tv entitlement environment.
@@ -41,7 +41,7 @@ Pi planner tasks can append validated work by returning a fenced JSON array:
 [
   {
     "id": "review-auth",
-    "project": "kyoot",
+    "project": "bash-workbench",
     "prompt": "Review authentication",
     "dependsOn": ["planner"]
   }
@@ -53,4 +53,4 @@ Workflow progress and control use the authenticated typed `workflows.*` RPC proc
 
 ## Status
 
-The Kyoot engine owns both ordinary agents and dynamic workflows. The legacy supervisor and Unix socket have been removed. All package dependencies resolve from the Workbench-local `../kyoot` workspace, and runtime helper paths resolve relative to source via `import.meta.url`.
+The bundled engine owns both ordinary agents and dynamic workflows. The legacy supervisor and Unix socket have been removed. All package dependencies resolve from this Workbench workspace, and runtime helper paths resolve relative to source via `import.meta.url`.

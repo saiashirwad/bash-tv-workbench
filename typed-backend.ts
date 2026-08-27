@@ -44,6 +44,7 @@ export interface WorkbenchProject {
   readonly id: string;
   readonly name: string;
   readonly root: string;
+  readonly hidden?: boolean;
 }
 export interface WorkbenchServices {
   readonly projects: ReadonlyMap<string, WorkbenchProject>;
@@ -159,12 +160,14 @@ export const kyootBackend = (
   listRuns: async () =>
     (await runs.list()).map((run) => publicRunSummary(run, services.projects)),
   listProjects: async () =>
-    [...services.projects.values()].map(({ id, name, root }): Project => ({
-      id,
-      name,
-      root,
-      writable: true,
-    })),
+    [...services.projects.values()]
+      .filter((project) => !project.hidden)
+      .map(({ id, name, root }): Project => ({
+        id,
+        name,
+        root,
+        writable: true,
+      })),
   liveSession: (input) => services.liveSession(input),
   liveSessionPage: (input) => services.liveSessionPage(input),
   liveTrajectory: (input) => services.liveTrajectory(input),

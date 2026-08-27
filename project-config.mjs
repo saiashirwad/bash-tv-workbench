@@ -2,7 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-const applicationRoot = fs.realpathSync(path.dirname(new URL(import.meta.url).pathname));
+const applicationRoot = fs.realpathSync(
+  path.dirname(new URL(import.meta.url).pathname),
+);
 export const configPath = path.resolve(
   process.env.BASH_WORKBENCH_CONFIG ||
     path.join(os.homedir(), ".local/share/bash-workbench/projects.json"),
@@ -19,16 +21,28 @@ export function loadProjects() {
     parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
   } catch (error) {
     if (error?.code !== "ENOENT")
-      throw new Error(`Cannot read project registry ${configPath}: ${error.message}`);
+      throw new Error(
+        `Cannot read project registry ${configPath}: ${error.message}`,
+      );
     parsed = { version: 1, projects: [] };
   }
 
   if (!Array.isArray(parsed.projects))
-    throw new Error(`Project registry ${configPath} must contain a projects array`);
-  const configured = parsed.projects.filter((entry) => entry?.id !== "kyoot-workbench");
+    throw new Error(
+      `Project registry ${configPath} must contain a projects array`,
+    );
+  const configured = parsed.projects.filter(
+    (entry) => !["bash-workbench", "kyoot-workbench"].includes(entry?.id),
+  );
   parsed.projects = [
-    { id: "kyoot-workbench", name: "Kyoot Workbench", root: applicationRoot },
+    { id: "bash-workbench", name: "Bash Workbench", root: applicationRoot },
     ...configured,
+    {
+      id: "kyoot-workbench",
+      name: "Bash Workbench",
+      root: applicationRoot,
+      hidden: true,
+    },
   ];
 
   const ids = new Set();
@@ -56,6 +70,7 @@ export function loadProjects() {
       id: entry.id,
       name: String(entry.name || path.basename(root)),
       root,
+      hidden: entry.hidden === true,
     };
   });
 }
